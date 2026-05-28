@@ -1135,6 +1135,15 @@ import {
   applyEnvironmentalPressure as _applyEnvironmentalPressure,
 } from './src/sim/events.js';
 
+import {
+  SPATIAL_CELL,
+  rebuildSpatialIndex as _rebuildSpatialIndex,
+  forCatsNear as _forCatsNear,
+  findNearest as _findNearest,
+  findNearestFood as _findNearestFood,
+  localDensity as _localDensity,
+} from './src/sim/spatial.js';
+
 // ─── STATE ────────────────────────────────────────────────────
 // The Simulation instance owns all sim state. `state` is an alias so existing
 // state.X access keeps working unchanged. Phase 1c-ii will start moving the
@@ -1735,15 +1744,8 @@ function drawArena(ctx) {
 
 // ─── POPULATION DYNAMICS ──────────────────────────────────────
 // Density stress around a cat — used to modify breeding willingness, aggression
-function localDensity(cat) {
-  let n = 0;
-  forCatsNear(cat.x, cat.y, 90, (c) => {
-    if (c === cat || c.dying) return false;
-    if (dist(cat, c) < 90) n++;
-    return false;
-  });
-  return n;
-}
+// localDensity wrapper — sim-aware version lives in spatial.js
+function localDensity(cat) { return _localDensity(sim, cat); }
 
 // Season + event helpers imported from ./src/sim/events.js.
 // rollSeasonalEvent + applyEnvironmentalPressure receive sim + a {logEvent,
@@ -1762,80 +1764,15 @@ function rollSeasonalEvent(season) { _rollSeasonalEvent(sim, season, eventSinks)
 function applyEnvironmentalPressure(cat, dt) { _applyEnvironmentalPressure(sim, cat, dt, eventSinks); }
 
 // ─── BEHAVIOR ─────────────────────────────────────────────────
-// ─── SPATIAL INDEX ────────────────────────────────────────────
-// Built once per tick. Queries only inspect cells within range
-// instead of every cat. Critical for performance at high pop.
-const SPATIAL_CELL = 100;            // cell size in logical px
-const spatialGrid = sim.spatialGrid; // "cx,cy" → array of cats (lives on sim)
-let spatialCellsW = 0, spatialCellsH = 0;
-const catById = sim.catById;         // O(1) cat lookup by id (lives on sim)
-
-function rebuildSpatialIndex() {
-  spatialGrid.clear();
-  catById.clear();
-  spatialCellsW = Math.ceil(arenaW / SPATIAL_CELL);
-  spatialCellsH = Math.ceil(arenaH / SPATIAL_CELL);
-  for (const c of state.cats) {
-    catById.set(c.id, c);
-    if (c.dying) continue;
-    const cx = Math.floor(c.x / SPATIAL_CELL);
-    const cy = Math.floor(c.y / SPATIAL_CELL);
-    const key = cx + ',' + cy;
-    let bucket = spatialGrid.get(key);
-    if (!bucket) { bucket = []; spatialGrid.set(key, bucket); }
-    bucket.push(c);
-  }
-}
-
-// Iterate cats whose grid cells overlap a circle of radius r around (x,y).
-// callback(cat) — return true to short-circuit (early exit).
-function forCatsNear(x, y, r, callback) {
-  const reach = Math.ceil(r / SPATIAL_CELL);
-  const cx = Math.floor(x / SPATIAL_CELL);
-  const cy = Math.floor(y / SPATIAL_CELL);
-  for (let dy = -reach; dy <= reach; dy++) {
-    for (let dx = -reach; dx <= reach; dx++) {
-      const bucket = spatialGrid.get((cx+dx) + ',' + (cy+dy));
-      if (!bucket) continue;
-      for (let i = 0; i < bucket.length; i++) {
-        if (callback(bucket[i])) return;
-      }
-    }
-  }
-}
-
-function findNearest(cat, predicate, maxDist=Infinity) {
-  let best = null, bestD = maxDist;
-  if (maxDist === Infinity || maxDist > Math.max(arenaW, arenaH)) {
-    // Unbounded — fall back to full sweep (rare)
-    for (const c of state.cats) {
-      if (c === cat || c.dying) continue;
-      if (!predicate(c)) continue;
-      const d = dist(cat, c);
-      if (d < bestD) { best = c; bestD = d; }
-    }
-  } else {
-    // Bounded — use spatial grid (fast path for the common case)
-    forCatsNear(cat.x, cat.y, maxDist, (c) => {
-      if (c === cat || c.dying) return false;
-      if (!predicate(c)) return false;
-      const d = dist(cat, c);
-      if (d < bestD) { best = c; bestD = d; }
-      return false;
-    });
-  }
-  return { target: best, d: bestD };
-}
-
-function findNearestFood(cat) {
-  let best = null, bestD = Infinity, bestIdx = -1;
-  for (let i = 0; i < state.food.length; i++) {
-    const f = state.food[i];
-    const d = Math.hypot(cat.x-f.x, cat.y-f.y);
-    if (d < bestD) { best = f; bestD = d; bestIdx = i; }
-  }
-  return { target: best, d: bestD, idx: bestIdx };
-}
+// Spatial index + neighbor queries live in ./src/sim/spatial.js.
+// catById is owned by sim; alias here for inline code that reads it directly
+// (mom/dad lookups in update/birth/death paths).
+const catById = sim.catById;
+// Local wrappers below preserve existing call-site signatures.
+function rebuildSpatialIndex() { _rebuildSpatialIndex(sim); }
+function forCatsNear(x, y, r, callback) { _forCatsNear(sim, x, y, r, callback); }
+function findNearest(cat, predicate, maxDist = Infinity) { return _findNearest(sim, cat, predicate, maxDist); }
+function findNearestFood(cat) { return _findNearestFood(sim, cat); }
 
 function chooseAction(cat) {
   if (cat.dying) return;
@@ -3990,13 +3927,17 @@ function beginSim() {
 }
 
 // We use a virtual canvas size in logical pixels.
-// arenaW / arenaH hold the logical drawing size.
-let arenaW = 0, arenaH = 0;
+// arenaW / arenaH live on the Simulation now (sim.arenaW, sim.arenaH) so the
+// bench harness has a world size without a window. These let bindings shadow
+// the sim values so existing call sites keep reading bare arenaW/arenaH.
+let arenaW = sim.arenaW, arenaH = sim.arenaH;
 function resize() {
   canvas = document.getElementById('arena');
   const dpr = window.devicePixelRatio || 1;
   arenaW = window.innerWidth;
   arenaH = window.innerHeight;
+  sim.arenaW = arenaW;
+  sim.arenaH = arenaH;
   canvas.width = arenaW * dpr;
   canvas.height = arenaH * dpr;
   canvas.style.width = arenaW + 'px';

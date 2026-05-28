@@ -31,6 +31,12 @@ export class Simulation {
     this.season = 'spring';                // auto-derived from simTime
     this.year = 1;                         // 1-indexed
 
+    // ─── WORLD SIZE ──────────────────────────────────────────
+    // Logical drawing area. Web layer updates these from window dims
+    // on resize. Headless bench just uses the defaults.
+    this.arenaW = config.arenaW ?? 800;
+    this.arenaH = config.arenaH ?? 600;
+
     // ─── CATS / FOOD / WORLD ─────────────────────────────────
     this.cats = [];
     this.food = [];
