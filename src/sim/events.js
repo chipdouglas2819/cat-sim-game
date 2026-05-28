@@ -143,8 +143,11 @@ export function applyEnvironmentalPressure(sim, cat, dt, { logEvent, triggerDeat
   if (cat.stage === 'kitten' || cat.dying) return;
   const evt = sim.activeEvent;
   const g = cat.genes;
-  // Scale mortality with population — at high pop, a "harsh winter" should actually cull noticeably
-  const popScale = clamp(sim.cats.length / 200, 1, 4);
+  // Scale event mortality with colony size. Small founding colonies are largely
+  // spared (a predator/plague in a 12-cat colony isn't a mass-casualty event),
+  // which lets the player's 2-cat start establish (audit B7) without adding
+  // extra founders. Large colonies get culled hard. 60 cats ≈ full lethality.
+  const popScale = clamp(sim.cats.length / 60, 0.25, 4);
 
   // ── Winter background: cold favors high energy + larger bodies ──
   if (sim.season === 'winter') {

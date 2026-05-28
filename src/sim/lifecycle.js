@@ -247,6 +247,12 @@ export function giveBirth(sim, mom, sinks) {
   if (sim.activeEvent === 'predator') {
     traitBonus += (father.bodyScale - 1) * 0.3;
   }
+  // FOUNDING BOOM: a tiny colony with resources to spare breeds prolifically
+  // (r-selection), so the player's 2-cat start reliably establishes before the
+  // founders age out (audit B7). Tapers off as the colony reaches viable size.
+  const livingNow = sim.cats.filter(c => !c.dying).length;
+  if (livingNow < 16) traitBonus += 1.8;
+  else if (livingNow < 32) traitBonus += 0.8;
 
   let litterSize = Math.max(0, Math.round(baseLitter * matFitness + traitBonus));
   litterSize = Math.min(litterSize, 5);   // was 7 — calmer turnover (round 1)

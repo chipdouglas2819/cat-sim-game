@@ -127,11 +127,11 @@ export class Simulation {
   // game (from the setup screen's staged genes) and the bench harness call
   // this, so the colony starts identically. Genes default to fresh random
   // rolls when not supplied. Call once, right after construction.
-  // extraFounders: random adults added beyond the named pair so the colony
-  // reliably establishes (audit B7 — a 2-cat start went extinct ~50-75% of the
-  // time). 4 extra (6 total) also gives more starting genetic diversity to
-  // select on. The named pair A/B carry the player's chosen genes.
-  seedFounders({ aGenes = null, bGenes = null, aName = null, bName = null, extraFounders = 4 } = {}) {
+  // The colony starts from the player's chosen pair (A & B) — exactly two cats.
+  // extraFounders stays available for bench experiments but defaults to 0 so the
+  // live game starts with just the two. Founder extinction (audit B7) is instead
+  // mitigated by a gentle founding period — see step()/early-growth handling.
+  seedFounders({ aGenes = null, bGenes = null, aName = null, bName = null, extraFounders = 0 } = {}) {
     // Feeding spots — fixed locations where food regenerates, spread evenly
     for (let i = 0; i < FEED_SPOTS_COUNT; i++) {
       const ang = (i / FEED_SPOTS_COUNT) * Math.PI * 2 + rand() * 0.4 - 0.2;
