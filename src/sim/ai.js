@@ -220,10 +220,12 @@ export function updateCat(sim, cat, dt, sinks) {
 
   // Needs decay (per sim-week)
   // Hunger drain scales with body size — bigger cats burn more.
-  // Base lowered 0.030→0.022 so cats starve less readily (audit B2 — colony was
-  // a death-sim; starvation was 85% of deaths). Big cats still pay more (the
-  // pow(bodyScale,1.5) term) — that's the cost half of the size trade-off.
-  let hungerDrain = (0.022 + cat.genes.appetite * 0.028) * Math.pow(cat.bodyScale, 1.5);
+  // Base lowered 0.030→0.022 so cats starve less readily (audit B2). Big cats
+  // still pay more, but the exponent is softened 1.5→1.15: at 1.5 the constant
+  // food penalty on large bodies overwhelmed every episodic winter/predator
+  // benefit, so size could only ever shrink (audit B4). Softer cost lets harsh
+  // environments push size UP while drought still pushes it down.
+  let hungerDrain = (0.022 + cat.genes.appetite * 0.028) * Math.pow(cat.bodyScale, 1.15);
   if (cat.stage === 'kitten') hungerDrain *= 0.35;
   if (cat.pregnantWith) hungerDrain *= 1.3;
   cat.hunger = clamp(cat.hunger - hungerDrain * dt, 0, 1);
