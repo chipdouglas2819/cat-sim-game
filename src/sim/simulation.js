@@ -231,8 +231,13 @@ export class Simulation {
       }
       // Environmental carrying capacity — food production has hard limits.
       // colonyScale shifts the whole equilibrium: smaller = faster evolution.
+      // BUGFIX: the floors used to be flat (15/6/4), which clamped every
+      // colonyScale <= ~0.6 to the same capacity — the knob did nothing in its
+      // useful low range. Floors now scale WITH colonyScale (tiny absolute
+      // safety floors only), so low scales produce genuinely small colonies.
+      // At scale 1 (the live default) this is essentially unchanged.
       const colonyScale = this.colonyScale || 1;
-      const areaCap = Math.max(15, Math.floor((this.arenaW * this.arenaH) / 20000 * colonyScale));
+      const areaCap = Math.max(Math.ceil(4 * colonyScale), Math.floor((this.arenaW * this.arenaH) / 20000 * colonyScale));
       let envMult = 1;
       if (this.season === 'winter') envMult *= 0.5;
       else if (this.season === 'fall') envMult *= 0.8;
@@ -240,10 +245,10 @@ export class Simulation {
       if (this.activeEvent === 'plentiful') envMult *= 1.6;
       else if (this.activeEvent === 'drought') envMult *= 0.35;
       else if (this.activeEvent === 'harshWinter') envMult *= 0.6;
-      const envCap = Math.max(6, Math.floor(areaCap * envMult));
+      const envCap = Math.max(2, Math.floor(areaCap * envMult));
       // Target = whichever is LOWER: per-cat demand OR environmental ceiling.
       const demand = Math.ceil(livingPop * FOOD_PER_CAT);
-      const targetFood = Math.max(FOOD_TARGET_MIN, Math.min(demand, envCap));
+      const targetFood = Math.max(Math.ceil(FOOD_TARGET_MIN * colonyScale), Math.min(demand, envCap));
       const shortfall = targetFood - this.food.length;
       if (shortfall > 0) {
         const dynamicBurst = Math.max(FOOD_BURST_MAX, Math.ceil(livingPop / 25));
