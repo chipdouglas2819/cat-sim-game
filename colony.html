@@ -2768,54 +2768,16 @@ function beginSim() {
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
   state.colonyScale = 1;
 
-  // resize canvas
+  // resize canvas (sets sim.arenaW/H before founders are placed)
   canvas = document.getElementById('arena');
   resize();
 
-  // Place feeding spots — fixed locations where food regenerates
-  // Distribute roughly evenly across the arena
-  for (let i = 0; i < FEED_SPOTS_COUNT; i++) {
-    const ang = (i / FEED_SPOTS_COUNT) * Math.PI * 2 + Math.random()*0.4 - 0.2;
-    const radius = Math.min(arenaW, arenaH) * 0.28;
-    state.feedSpots.push({
-      x: arenaW/2 + Math.cos(ang) * radius + (Math.random()-0.5)*30,
-      y: arenaH/2 + Math.sin(ang) * radius + (Math.random()-0.5)*30,
-    });
-  }
-
-  // build starting cats — male and female, both adult, placed in middle
-  const A = createCat({
-    sex:'M', genes: state.starter.A.genes, name: state.starter.A.name,
-    age: 50,
-    x: arenaW*0.4, y: arenaH*0.5,
+  // Founder pair + feeding spots + initial food — all in the sim now, so the
+  // bench harness starts colonies identically. Genes come from the setup screen.
+  sim.seedFounders({
+    aGenes: state.starter.A.genes, aName: state.starter.A.name,
+    bGenes: state.starter.B.genes, bName: state.starter.B.name,
   });
-  A._gen = 1;
-  const B = createCat({
-    sex:'F', genes: state.starter.B.genes, name: state.starter.B.name,
-    age: 50,
-    x: arenaW*0.6, y: arenaH*0.5,
-  });
-  B._gen = 1;
-  state.cats.push(A, B);
-  state.founders = [A.id, B.id];
-  recordFirsts(A);
-  recordFirsts(B);
-  // Snapshot founder behavioral gene means for live drift narration
-  state.founderGenes = {};
-  state.lastDriftAnnouncement = {};
-  for (const t of ['boldness','sociability','playfulness','aggression','energy','appetite']) {
-    state.founderGenes[t] = (A.genes[t] + B.genes[t]) / 2;
-  }
-  state.founderGenes.bodyScale = (A.bodyScale + B.bodyScale) / 2;
-  state.lastDriftCheck = 0;
-  // bias them toward each other initially
-  A.social = 0.3; B.social = 0.3;
-  logEvent(`${A.name} & ${B.name} settle into the colony.`, 'event');
-  // seed initial food at the feeding spots
-  for (const spot of state.feedSpots) {
-    const ang = Math.random() * Math.PI * 2;
-    dropFood(spot.x + Math.cos(ang)*15, spot.y + Math.sin(ang)*15);
-  }
 }
 
 // We use a virtual canvas size in logical pixels.

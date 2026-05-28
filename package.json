@@ -1,0 +1,10 @@
+{
+  "name": "colony-cat-sim",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Colony — a cat colony evolution simulation. Shared sim modules in src/sim/ drive both the web game (colony.html) and the headless bench (bench/).",
+  "scripts": {
+    "smoke": "node bench/smoke.js"
+  }
+}

@@ -1,15 +1,16 @@
 import {
-  SIM_DAY_REAL_SEC,
+  SIM_DAY_REAL_SEC, FEED_SPOTS_COUNT,
   FOOD_SPAWN_INTERVAL, FOOD_PER_CAT, FOOD_TARGET_MIN, FOOD_BURST_MAX,
   FOOD_RANDOM_CHANCE, FOOD_SPOT_JITTER, FOOD_LIFETIME,
 } from './constants.js';
 import { mulberry32, setRandomSource, rand, clamp } from './util.js';
+import { rollGenes } from './genetics.js';
 import {
   deriveSeason, deriveYear, rollSeasonalEvent, driftWeather, makeStartingWeather,
   isMajorEvent, EVENT_PRIORITY,
 } from './events.js';
 import { rebuildSpatialIndex } from './spatial.js';
-import { dropFood, triggerDeath } from './lifecycle.js';
+import { createCat, recordFirsts, dropFood, triggerDeath } from './lifecycle.js';
 import { updateCat } from './ai.js';
 import { computeDiversity } from './diversity.js';
 
@@ -115,6 +116,51 @@ export class Simulation {
       logEvent: (text, type) => this.logEvent(text, type),
       triggerDeath: (cat, reason) => triggerDeath(this, cat, reason, this._sinks),
     };
+  }
+
+  // Set up the founding pair + feeding spots + initial food. Both the web
+  // game (from the setup screen's staged genes) and the bench harness call
+  // this, so the colony starts identically. Genes default to fresh random
+  // rolls when not supplied. Call once, right after construction.
+  seedFounders({ aGenes = null, bGenes = null, aName = null, bName = null } = {}) {
+    // Feeding spots — fixed locations where food regenerates, spread evenly
+    for (let i = 0; i < FEED_SPOTS_COUNT; i++) {
+      const ang = (i / FEED_SPOTS_COUNT) * Math.PI * 2 + rand() * 0.4 - 0.2;
+      const radius = Math.min(this.arenaW, this.arenaH) * 0.28;
+      this.feedSpots.push({
+        x: this.arenaW / 2 + Math.cos(ang) * radius + (rand() - 0.5) * 30,
+        y: this.arenaH / 2 + Math.sin(ang) * radius + (rand() - 0.5) * 30,
+      });
+    }
+    const A = createCat(this, {
+      sex: 'M', genes: aGenes || rollGenes('M'), name: aName,
+      age: 50, x: this.arenaW * 0.4, y: this.arenaH * 0.5,
+    });
+    A._gen = 1;
+    const B = createCat(this, {
+      sex: 'F', genes: bGenes || rollGenes('F'), name: bName,
+      age: 50, x: this.arenaW * 0.6, y: this.arenaH * 0.5,
+    });
+    B._gen = 1;
+    this.cats.push(A, B);
+    this.founders = [A.id, B.id];
+    recordFirsts(this, A);
+    recordFirsts(this, B);
+    // Snapshot founder behavioral gene means for drift comparison
+    this.founderGenes = {};
+    this.lastDriftAnnouncement = {};
+    for (const t of BEHAVIORAL_TRAITS) this.founderGenes[t] = (A.genes[t] + B.genes[t]) / 2;
+    this.founderGenes.bodyScale = (A.bodyScale + B.bodyScale) / 2;
+    // Bias them toward each other initially
+    A.social = 0.3;
+    B.social = 0.3;
+    this.logEvent(`${A.name} & ${B.name} settle into the colony.`, 'event');
+    // Seed initial food at the feeding spots
+    for (const spot of this.feedSpots) {
+      const ang = rand() * Math.PI * 2;
+      dropFood(this, spot.x + Math.cos(ang) * 15, spot.y + Math.sin(ang) * 15);
+    }
+    return { A, B };
   }
 
   // Append an event to the log, with the same pop-based filtering the live
@@ -331,8 +377,11 @@ export class Simulation {
   }
 
   // Run forward N sim-years headlessly with a fixed timestep. For the bench.
-  // Stops early if the colony dies out. Returns the final snapshot.
-  runYears(years, { dt = 0.5, onYear = null } = {}) {
+  // dt default 0.1 sim-weeks ≈ the live game at ~6× speed — small enough that
+  // movement/eating/navigation behave the same (the live game caps dt ~0.13).
+  // Larger dt makes cats overshoot food/mates (cat.x += vx*dt*24). Stops early
+  // if the colony dies out. Returns the final snapshot.
+  runYears(years, { dt = 0.1, onYear = null } = {}) {
     const endTime = this.simTime + years * 52;
     let lastYear = this.year;
     this.phase = 'running';
