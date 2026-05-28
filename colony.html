@@ -1103,69 +1103,23 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   <div class="end-container" id="endContent"></div>
 </div>
 
-<script>
+<script type="module">
 // ════════════════════════════════════════════════════════════════
 //   COLONY — cat genetics & behavior simulator
 // ════════════════════════════════════════════════════════════════
 
-// ─── CONSTANTS ────────────────────────────────────────────────
-const SIM_DAY_REAL_SEC = 4;          // 1 sim-day = 4 real seconds at 1x
-const KITTEN_DAYS = 15;
-const JUVENILE_DAYS = 30;
-const ADULT_END = 300;
-const SENIOR_END = 400;               // base lifespan
-const PREGNANCY_DAYS = 9;             // pregnancy in sim-weeks (~real cat ~9 weeks)
-const BREED_COOLDOWN = 6;             // post-birth cooldown (lets females have 2 litters/season)
-const FOOD_LIFETIME = 80;             // sim-days a food morsel persists (longer — less waste)
-const FEED_SPOTS_COUNT = 3;           // permanent gathering points in the arena
-const FOOD_SPAWN_INTERVAL = 0.4;      // sim-days between spawn checks
-const FOOD_PER_CAT = 0.55;            // morsels per cat we aim to keep on the ground
-const FOOD_TARGET_MIN = 4;            // minimum target regardless of pop
-const FOOD_BURST_MAX = 4;             // morsels per spawn check when catching up
-const FOOD_RANDOM_CHANCE = 0.35;      // chance a morsel spawns at random location instead of feeding spot
-const FOOD_SPOT_JITTER = 80;          // morsel scatter radius around a spot (was 32)
-// Soft carrying capacity — populations self-regulate via stress instead of a hard cap.
-// Hard ceiling kept as a safety valve only (never hit in normal runs).
-const POP_SOFT_TARGET_BASE = 25;     // baseline comfortable population
-const POP_HARD_CEILING = 80;         // never exceed (safety against runaway)
-const ESTRUS_CYCLE_WEEKS = 8;        // estrus cycle (real cats: 2-3 weeks between heats)
-const ESTRUS_DURATION = 4;           // weeks per cycle receptive (so cats are in heat ~half the time during breeding season)
-const MUTATION_RATE = 0.02;
-const NAME_POOL = [
-  'Whiskers','Mittens','Tabitha','Pippa','Marlow','Juno','Sable','Wren',
-  'Cinder','Olive','Mochi','Bramble','Pebble','Pumpkin','Slate','Linden',
-  'Clover','Soot','Apricot','Hazel','Felix','Dorian','Magnolia','Birch',
-  'Cricket','Pip','Atlas','Bean','Fig','Saffron','Cosmo','Nettle','Reed',
-  'Thistle','Daphne','Iris','Otis','Pearl','Quince','Rye','Sorrel','Tansy',
-  'Acorn','Almond','Amber','Arrow','Ash','Aspen','Aster','Autumn','Basil',
-  'Bay','Beech','Biscuit','Blossom','Boots','Briar','Brindle','Brook',
-  'Buttons','Caramel','Cedar','Chestnut','Chip','Cocoa','Coffee','Crumpet',
-  'Daisy','Dandelion','Dottie','Drift','Echo','Ember','Fennel','Fern',
-  'Finch','Flax','Fleck','Flora','Frost','Ginger','Goose','Hawthorn',
-  'Honey','Indigo','Ivy','Jasper','Juniper','Kettle','Lark','Laurel',
-  'Lavender','Lichen','Lily','Loam','Loon','Lupin','Maple','Marigold',
-  'Marrow','Marsh','Meadow','Milkweed','Minnow','Mist','Moss','Muffin',
-  'Mulberry','Nimbus','Nutmeg','Oak','Onyx','Opal','Orchard','Otter',
-  'Patches','Peach','Penny','Pickle','Pine','Pinto','Plover','Plum',
-  'Poppy','Posy','Primrose','Quill','Rain','Raven','Rose','Rowan',
-  'Rust','Sage','Scout','Seed','Shadow','Shale','Smoke','Smudge',
-  'Sparrow','Stitch','Sweetpea','Sycamore','Tarragon','Teal','Thatch',
-  'Tilly','Toffee','Truffle','Vesper','Violet','Walnut','Whimsy',
-  'Willow','Winter','Wisp','Wisteria','Yarrow','Yew','Zephyr','Mango',
-  'Mable','Lulu','Cleo','Suki','Tofu','Yuki','Suki','Pip','Bingo',
-  'Beanie','Tucker','Milo','Theo','Oscar','Rusty','Charlie','Bruno'
-];
+import {
+  SIM_DAY_REAL_SEC, KITTEN_DAYS, JUVENILE_DAYS, ADULT_END, SENIOR_END,
+  PREGNANCY_DAYS, BREED_COOLDOWN, ESTRUS_CYCLE_WEEKS, ESTRUS_DURATION, MUTATION_RATE,
+  FOOD_LIFETIME, FEED_SPOTS_COUNT, FOOD_SPAWN_INTERVAL, FOOD_PER_CAT,
+  FOOD_TARGET_MIN, FOOD_BURST_MAX, FOOD_RANDOM_CHANCE, FOOD_SPOT_JITTER,
+  POP_SOFT_TARGET_BASE, POP_HARD_CEILING,
+  NAME_POOL, ALLELE_POOLS,
+} from './src/sim/constants.js';
 
-// Visible gene alleles (ordered for dominance where applicable)
-const ALLELE_POOLS = {
-  B: ['B','b'],                       // black > brown
-  D: ['D','d'],                       // dense > dilute
-  A: ['A','a'],                       // agouti > solid
-  T: ['Mc','Cs','Sp','Tk'],           // tabby pattern (random pick, codom in inheritance)
-  S: ['S','s'],                       // white spotting (codominant)
-  L: ['L','l'],                       // short > long
-  W: ['W','w']                        // white > non-white (W rare)
-};
+import {
+  rand, randInt, pick, clamp, dist, gauss,
+} from './src/sim/util.js';
 
 // ─── STATE ────────────────────────────────────────────────────
 const state = {
@@ -1215,15 +1169,7 @@ const state = {
 };
 
 // ─── UTILS ────────────────────────────────────────────────────
-const rand = (a=1, b) => b === undefined ? Math.random()*a : a + Math.random()*(b-a);
-const randInt = (a, b) => Math.floor(rand(a, b+1));
-const pick = arr => arr[Math.floor(Math.random()*arr.length)];
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const dist = (a, b) => { const dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); };
-const gauss = () => { // Box-Muller
-  let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
-  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-};
+// rand, randInt, pick, clamp, dist, gauss imported from ./src/sim/util.js
 const id = () => state.nextId++;
 
 // ─── GENES ────────────────────────────────────────────────────
@@ -3911,13 +3857,16 @@ function endSimulation() {
       </div>
     ` : ''}
 
-    <button class="restart-btn" onclick="restart()">Start a new colony</button>
+    <button class="restart-btn">Start a new colony</button>
   `;
   // Hide game UI so topbar/inspector don't compete with end screen
   document.getElementById('game').classList.remove('active');
   document.getElementById('inspector').classList.remove('open');
   document.getElementById('confirmModal').classList.add('hidden');
   document.getElementById('end').classList.add('active');
+  // Bind restart button (inline onclick won't work — script is a module)
+  const restartBtn = document.querySelector('.restart-btn');
+  if (restartBtn) restartBtn.addEventListener('click', restart);
   // Reset scroll on the end container in case it was scrolled before
   setTimeout(() => { document.getElementById('end').scrollTop = 0; }, 0);
   // Render charts after layout settles (two rAFs to be safe)
