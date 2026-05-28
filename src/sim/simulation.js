@@ -127,7 +127,11 @@ export class Simulation {
   // game (from the setup screen's staged genes) and the bench harness call
   // this, so the colony starts identically. Genes default to fresh random
   // rolls when not supplied. Call once, right after construction.
-  seedFounders({ aGenes = null, bGenes = null, aName = null, bName = null } = {}) {
+  // extraFounders: random adults added beyond the named pair so the colony
+  // reliably establishes (audit B7 — a 2-cat start went extinct ~50-75% of the
+  // time). 4 extra (6 total) also gives more starting genetic diversity to
+  // select on. The named pair A/B carry the player's chosen genes.
+  seedFounders({ aGenes = null, bGenes = null, aName = null, bName = null, extraFounders = 4 } = {}) {
     // Feeding spots — fixed locations where food regenerates, spread evenly
     for (let i = 0; i < FEED_SPOTS_COUNT; i++) {
       const ang = (i / FEED_SPOTS_COUNT) * Math.PI * 2 + rand() * 0.4 - 0.2;
@@ -147,16 +151,29 @@ export class Simulation {
       age: 50, x: this.arenaW * 0.6, y: this.arenaH * 0.5,
     });
     B._gen = 1;
-    this.cats.push(A, B);
-    this.founders = [A.id, B.id];
-    recordFirsts(this, A);
-    recordFirsts(this, B);
-    // Snapshot founder behavioral gene means for drift comparison
+    const founders = [A, B];
+    // Extra founders — alternating sex, random genes, scattered around the arena
+    for (let i = 0; i < extraFounders; i++) {
+      const sex = i % 2 === 0 ? 'F' : 'M';
+      const f = createCat(this, {
+        sex, genes: rollGenes(sex),
+        age: 40 + Math.floor(rand() * 30),
+        x: this.arenaW * (0.25 + rand() * 0.5),
+        y: this.arenaH * (0.3 + rand() * 0.4),
+      });
+      f._gen = 1;
+      founders.push(f);
+    }
+    for (const f of founders) { this.cats.push(f); recordFirsts(this, f); }
+    this.founders = founders.map(f => f.id);
+    // Snapshot founder gene means (over ALL founders) for drift comparison
     this.founderGenes = {};
     this.lastDriftAnnouncement = {};
-    for (const t of BEHAVIORAL_TRAITS) this.founderGenes[t] = (A.genes[t] + B.genes[t]) / 2;
-    this.founderGenes.bodyScale = (A.bodyScale + B.bodyScale) / 2;
-    // Bias them toward each other initially
+    for (const t of BEHAVIORAL_TRAITS) {
+      this.founderGenes[t] = founders.reduce((s, f) => s + f.genes[t], 0) / founders.length;
+    }
+    this.founderGenes.bodyScale = founders.reduce((s, f) => s + f.bodyScale, 0) / founders.length;
+    // Bias the named pair toward each other initially
     A.social = 0.3;
     B.social = 0.3;
     this.logEvent(`${A.name} & ${B.name} settle into the colony.`, 'event');
@@ -165,7 +182,7 @@ export class Simulation {
       const ang = rand() * Math.PI * 2;
       dropFood(this, spot.x + Math.cos(ang) * 15, spot.y + Math.sin(ang) * 15);
     }
-    return { A, B };
+    return { A, B, founders };
   }
 
   // Kill a cat through the sim's own sinks. Used by the web layer's end-check

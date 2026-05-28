@@ -153,34 +153,34 @@ export function applyEnvironmentalPressure(sim, cat, dt, { logEvent, triggerDeat
     if (cat.stage === 'senior') cat.hunger = clamp(cat.hunger - 0.008 * dt, 0, 1);
   }
 
-  // ── HARSH WINTER ──
-  // LOSERS: low-energy, small, low-condition cats die. SHARP mortality.
-  // WINNERS: high-energy + larger cats — also gain a slight condition bonus from surviving (toughens up)
+  // ── HARSH WINTER ──  selects FOR large body + high energy, AGAINST small/low-energy.
+  // Strong, clear size pressure UP (audit B4: winter must beat the small-cat
+  // baseline so size can evolve upward). Lethality raised so winter is a real
+  // selector, not 1% of deaths (audit B2/B3).
   if (evt === 'harshWinter') {
-    const vuln = (1 - g.energy) * 0.7 + (1 - (cat.condition || 1)) * 0.3;
-    const sizeBenefit = clamp((cat.bodyScale - 0.85), 0, 0.4);
-    const baseRisk = cat.stage === 'senior' ? 0.0040 : 0.0014;
-    const risk = baseRisk * dt * vuln * (1 - sizeBenefit) * popScale;
+    const smallPenalty = clamp(1.05 - cat.bodyScale, 0, 0.6);     // small cats freeze
+    const vuln = (1 - g.energy) * 0.6 + (1 - (cat.condition || 1)) * 0.2 + smallPenalty * 0.7;
+    const baseRisk = cat.stage === 'senior' ? 0.0065 : 0.0028;
+    const risk = baseRisk * dt * vuln * popScale;
     if (rand() < risk) {
       logEvent(`${cat.name} did not survive the winter`, 'death');
       triggerDeath(cat, 'harsh winter');
       return;
     }
-    // Survivors with strong cold-tolerance build condition slightly (hardy adaptation)
-    if (g.energy > 0.65 && cat.bodyScale > 1) {
-      cat.condition = clamp(cat.condition + 0.002 * dt, 0.45, 1);
+    // Large, high-energy survivors toughen up
+    if (g.energy > 0.6 && cat.bodyScale > 1.05) {
+      cat.condition = clamp(cat.condition + 0.003 * dt, 0.45, 1);
     }
   }
 
-  // ── PREDATOR ──
-  // LOSERS: bold non-aggressive cats wander into danger; LARGE cats are easier to catch (less nimble)
-  // WINNERS: aggressive defenders fight back; SMALL cats are nimble and evade. Multiple survival paths.
+  // ── PREDATOR ──  selects FOR aggression + body (defenders), AGAINST boldness.
+  // Defense (big + aggressive) is the dominant survival path so predator pushes
+  // aggression + size UP (audit B3/B4); small agility is a weaker secondary path.
   else if (evt === 'predator') {
-    const exposureRisk = clamp((g.boldness - 0.35), 0, 0.65);
-    const defense = clamp(g.aggression - 0.3, 0, 0.7) * cat.bodyScale;
-    // Small cats dodge — agility bonus for bodyScale below 1
-    const agility = clamp((1 - cat.bodyScale), 0, 0.45);
-    const netRisk = (exposureRisk - defense * 0.8 - agility * 0.6) * 0.005 * dt * popScale;
+    const exposureRisk = clamp((g.boldness - 0.3), 0, 0.7);
+    const defense = clamp(g.aggression - 0.3, 0, 0.7) * (0.5 + cat.bodyScale);  // big aggressive cats fight off
+    const agility = clamp((0.95 - cat.bodyScale), 0, 0.4) * 0.5;                // small cats dodge (secondary)
+    const netRisk = (exposureRisk - defense - agility) * 0.011 * dt * popScale;
     if (netRisk > 0 && rand() < netRisk) {
       logEvent(`${cat.name} was taken by a predator`, 'death');
       triggerDeath(cat, 'predator');
@@ -188,37 +188,36 @@ export function applyEnvironmentalPressure(sim, cat, dt, { logEvent, triggerDeat
     }
   }
 
-  // ── DROUGHT ──
-  // LOSERS: high-appetite large cats — fastest to starve
-  // WINNERS: small low-appetite cats — survive on little. Bold cats forage further (compensates).
+  // ── DROUGHT ──  selects FOR small + low-appetite, AGAINST large/high-appetite.
+  // The main downward-size pressure (counterbalances winter/predator).
   else if (evt === 'drought') {
-    const droughtVuln = (g.appetite - 0.4) * 0.7 + (cat.bodyScale - 0.9) * 0.6 - (g.boldness - 0.5) * 0.3;
+    const droughtVuln = (g.appetite - 0.4) * 0.7 + (cat.bodyScale - 0.9) * 0.7 - (g.boldness - 0.5) * 0.3;
     if (droughtVuln > 0) {
-      cat.hunger = clamp(cat.hunger - 0.04 * droughtVuln * dt, 0, 1);
-      if (droughtVuln > 0.3 && rand() < 0.0012 * dt * droughtVuln * popScale) {
+      cat.hunger = clamp(cat.hunger - 0.05 * droughtVuln * dt, 0, 1);
+      if (droughtVuln > 0.25 && rand() < 0.0025 * dt * droughtVuln * popScale) {
         logEvent(`${cat.name} wasted away in the drought`, 'death');
         triggerDeath(cat, 'drought');
         return;
       }
     }
-    // Small efficient cats actually gain a bit of condition relative to others
-    if (droughtVuln < -0.1) cat.condition = clamp(cat.condition + 0.001 * dt, 0.45, 1);
+    // Small efficient cats gain condition relative to others
+    if (droughtVuln < -0.1) cat.condition = clamp(cat.condition + 0.0015 * dt, 0.45, 1);
   }
 
-  // ── EPIDEMIC ──
-  // LOSERS: high-sociability cats spend more time near others, catch faster (disease tick handles)
-  // WINNERS: aloof cats avoid crowds (existing wander drift), so disease rolls less often for them
-  // We ALSO add direct epidemic mortality scaling with sociability for non-sick cats —
-  // even brief contact with sick cats by social cats is more often lethal.
+  // ── EPIDEMIC ──  selects AGAINST sociability (crowders catch it), FOR aloofness.
+  // Lethality raised + threshold lowered so it overcomes the baseline pro-social
+  // litter bonus — previously epidemic drifted sociability UP (backwards, B3).
   else if (evt === 'epidemic') {
-    if (g.sociability > 0.55 && !cat.sick && (cat.immunityTimer || 0) <= 0) {
-      const risk = (g.sociability - 0.4) * 0.0008 * dt * popScale;
+    if (g.sociability > 0.45 && !cat.sick && (cat.immunityTimer || 0) <= 0) {
+      const risk = (g.sociability - 0.3) * 0.0038 * dt * popScale;
       if (rand() < risk) {
         logEvent(`${cat.name} succumbed to the plague`, 'death');
         triggerDeath(cat, 'plague');
         return;
       }
     }
+    // Aloof cats avoid crowds → fare better (reinforces anti-social selection)
+    if (g.sociability < 0.4) cat.condition = clamp(cat.condition + 0.001 * dt, 0.45, 1);
   }
 
   // ── PLENTIFUL ──

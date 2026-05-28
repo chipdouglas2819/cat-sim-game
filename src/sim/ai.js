@@ -93,11 +93,17 @@ export function chooseAction(sim, cat) {
   // Continue sleep
   if (cat.state === 'sleep' && cat.energy < 0.9 && cat.stateTimer > 0) return;
 
-  // Mate opportunity (adult, willing, not on cooldown). No artificial cap — mortality regulates pop.
+  // Mate opportunity (adult, willing, not on cooldown).
+  // Density-dependent fertility: when food per cat is scarce the colony breeds
+  // LESS, so it self-limits via fewer births instead of a food wall that culls
+  // kittens by starvation (audit B2 — that made it a death-sim). The colony now
+  // stabilizes just below carrying capacity; most deaths become old age + events.
   if ((cat.stage === 'adult' || cat.stage === 'senior') &&
       sim.simTime > cat.cooldownUntil &&
-      cat.hunger > 0.4 && cat.energy > 0.35) {
-    const willingThreshold = 0.35 - cat.genes.sociability * 0.2 - cat.genes.playfulness * 0.1;
+      cat.hunger > 0.45 && cat.energy > 0.35) {
+    const foodPerCat = sim.food.length / Math.max(1, sim.cats.length);
+    const scarcity = clamp((0.35 - foodPerCat) / 0.35, 0, 1);  // 0 = plentiful, 1 = none
+    const willingThreshold = 0.35 - cat.genes.sociability * 0.2 - cat.genes.playfulness * 0.1 + scarcity * 0.9;
     if (rand() > willingThreshold) {
       const partner = findNearest(sim, cat, c =>
         c.sex !== cat.sex &&
@@ -214,7 +220,10 @@ export function updateCat(sim, cat, dt, sinks) {
 
   // Needs decay (per sim-week)
   // Hunger drain scales with body size — bigger cats burn more.
-  let hungerDrain = (0.030 + cat.genes.appetite * 0.030) * Math.pow(cat.bodyScale, 1.5);
+  // Base lowered 0.030→0.022 so cats starve less readily (audit B2 — colony was
+  // a death-sim; starvation was 85% of deaths). Big cats still pay more (the
+  // pow(bodyScale,1.5) term) — that's the cost half of the size trade-off.
+  let hungerDrain = (0.022 + cat.genes.appetite * 0.028) * Math.pow(cat.bodyScale, 1.5);
   if (cat.stage === 'kitten') hungerDrain *= 0.35;
   if (cat.pregnantWith) hungerDrain *= 1.3;
   cat.hunger = clamp(cat.hunger - hungerDrain * dt, 0, 1);

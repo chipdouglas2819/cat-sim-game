@@ -82,9 +82,10 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     0.6 + sizeGene * 0.8 + (genes.appetite - 0.5) * 0.10 + (genes.energy - 0.5) * 0.06 + gauss() * 0.04,
     0.45, 1.6
   );
-  // Smaller cats live longer (less metabolic stress); larger cats burn out faster.
-  // This is a real biological trade-off and a key advantage for small body size.
-  const sizeLifeMod = 1 + (1 - bodyScale) * 0.35;   // 0.6× body ~ +14%, 1.5× body ~ -17%
+  // Smaller cats live a bit longer (less metabolic stress). Kept mild (0.18) so
+  // it's a gentle nudge, not an unconditional small-cat win — body size should
+  // track environment, not always shrink (audit B4).
+  const sizeLifeMod = 1 + (1 - bodyScale) * 0.18;   // 0.6× body ~ +7%, 1.5× body ~ -9%
   const lifespanFinal = lifespan * sizeLifeMod;
   const rareTraits = [];
   // Dwarf — emerges naturally at the low tail of the size gene (heritable!)
@@ -189,16 +190,19 @@ export function giveBirth(sim, mom, sinks) {
   // ── LITTER SIZE: trait advantages are CONDITIONAL on environment ──
   // No trait gives unconditional reproductive advantage. Selection direction
   // depends on context.
-  const baseLitter = 3 + Math.floor(rand() * 3);  // 3-5 base
+  // Smaller base litters (2-4, was 3-5) — the colony was a death-sim: explosive
+  // births → overpopulation → mass starvation. Calmer turnover (audit B2/round1).
+  const baseLitter = 2 + Math.floor(rand() * 3);  // 2-4 base
   // Maternal condition matters (well-fed moms have more), but NOT body size directly
   const matFitness = clamp(mom.condition, 0.5, 1.2);
   // Trait bonus is now SMALL and conditional
   let traitBonus = 0;
 
-  // SIZE TRADE-OFF: small mothers produce MORE kittens (r-strategy: many cheap
-  // offspring), large mothers produce fewer but invest more per kitten
-  // (K-strategy: see survival advantages).
-  traitBonus += (1 - mom.bodyScale) * 0.8;   // 0.6× body → +0.3 kittens, 1.5× body → -0.4 kittens
+  // SIZE TRADE-OFF: small mothers produce somewhat MORE kittens (r-strategy),
+  // large mothers fewer but with survival advantages elsewhere (winter, fights,
+  // predator defense). Weakened 0.8→0.35 so it's not an unconditional small-cat
+  // win — size should track environment (audit B4).
+  traitBonus += (1 - mom.bodyScale) * 0.35;
 
   // High boldness: better foraging in lean times, but extra predator risk loss
   if (sim.activeEvent === 'plentiful' || sim.activeEvent === 'drought') {
@@ -230,13 +234,22 @@ export function giveBirth(sim, mom, sinks) {
   } else {
     traitBonus += (mom.genes.sociability - 0.5) * 0.2;
   }
+  // Playfulness: a real trade-off (audit B5 — was unselected). Playful colonies
+  // are socially cohesive → better kitten care when there's energy to spare, but
+  // play wastes calories when food is scarce. Selectable in BOTH directions:
+  // favored in abundance/peace, costly in drought/winter.
+  if (sim.activeEvent === 'plentiful' || (!sim.activeEvent && sim.season !== 'winter')) {
+    traitBonus += (mom.genes.playfulness - 0.5) * 0.35;
+  } else if (sim.activeEvent === 'drought' || sim.activeEvent === 'harshWinter' || sim.season === 'winter') {
+    traitBonus -= (mom.genes.playfulness - 0.5) * 0.4;
+  }
   // Father's body size only helps in defense scenarios
   if (sim.activeEvent === 'predator') {
     traitBonus += (father.bodyScale - 1) * 0.3;
   }
 
   let litterSize = Math.max(0, Math.round(baseLitter * matFitness + traitBonus));
-  litterSize = Math.min(litterSize, 7);
+  litterSize = Math.min(litterSize, 5);   // was 7 — calmer turnover (round 1)
   // Postpartum mortality risk
   const motherRisk = (litterSize - 2) * 0.02 + (1 - mom.condition) * 0.08 + F * 0.05;
   const momWillDie = rand() < motherRisk;
