@@ -1698,39 +1698,10 @@ function drawDying(ctx, cat) {
 }
 
 // ─── EVENTS / LOG ─────────────────────────────────────────────
-// Event-type priorities for high-pop filtering. 'major' tier passes always.
-const EVENT_PRIORITY = { 'event': 1, 'birth': 2, 'mate': 2, 'death': 2, 'major': 5 };
-// Substrings that mark colony-level messages that should always pass even at high pop
-const MAJOR_KEYWORDS = ['Year ', 'Spring returns', 'Summer arrives', 'Fall sets in', 'Winter falls',
-  'predator stalks', 'harsh winter', 'plentiful', 'drought', 'epidemic', 'Illness sweeps',
-  'poor harvest', 'abundant fall', 'These cats are becoming'];
-
-function isMajorEvent(text) {
-  for (let i = 0; i < MAJOR_KEYWORDS.length; i++) {
-    if (text.indexOf(MAJOR_KEYWORDS[i]) !== -1) return true;
-  }
-  return false;
-}
-
-function logEvent(text, type='event') {
-  const pop = state.cats.length;
-  // Above 500 cats: suppress everything except colony-level events
-  if (pop > 500 && !isMajorEvent(text)) return;
-  // Mid pop (200-500): drop low-priority events probabilistically
-  if (pop > 200 && pop <= 500 && (EVENT_PRIORITY[type] || 1) < 2 && Math.random() < 0.6) return;
-  state.events.unshift({simTime: state.simTime, text, type});
-  if (state.events.length > 40) state.events.pop();
-  // Time-throttle log render — at most once per 250ms
-  const now = performance.now();
-  if (!state._logRenderQueued && (now - (state._lastLogRender || 0)) > 250) {
-    state._logRenderQueued = true;
-    requestAnimationFrame(() => {
-      state._logRenderQueued = false;
-      state._lastLogRender = performance.now();
-      renderLog();
-    });
-  }
-}
+// Filtering + sim.events management live in Simulation.logEvent (sim-side, so
+// the bench's event list matches the player's). This wrapper just forwards;
+// the log is re-rendered each frame from tick().
+function logEvent(text, type = 'event') { sim.logEvent(text, type); }
 
 function renderLog() {
   const wrap = document.getElementById('log');
@@ -1745,177 +1716,38 @@ function renderLog() {
 }
 
 // ─── MAIN LOOP ────────────────────────────────────────────────
+// The sim half of the tick lives in Simulation.step(dt) (src/sim/simulation.js).
+// This function only does web work: compute real-time dt, drive the sim, then
+// render + update DOM. The bench harness drives the same sim.step() with a
+// fixed dt and no DOM.
 function tick(time) {
   if (state.phase === 'running') {
     if (!state.lastTime) state.lastTime = time;
     const realDt = Math.min((time - state.lastTime) / 1000, 1/15);
     state.lastTime = time;
     const dt = realDt / SIM_DAY_REAL_SEC * state.speed;
-    state.simTime += dt;
-    // Season + year tracking
-    const newSeason = deriveSeason(state.simTime);
-    const newYear = deriveYear(state.simTime);
-    if (newSeason !== state.season) {
-      state.season = newSeason;
-      const seasonMsg = newSeason === 'spring' ? 'Spring returns. Breeding season begins.' :
-                        newSeason === 'summer' ? 'Summer arrives.' :
-                        newSeason === 'fall' ? 'Fall sets in. Breeding season ends.' :
-                        'Winter falls over the colony.';
-      logEvent(seasonMsg, 'event');
-      // Roll for seasonal environmental event
-      rollSeasonalEvent(newSeason);
-    }
-    if (newYear !== state.year) {
-      state.year = newYear;
-      logEvent(`Year ${newYear} begins.`, 'event');
-      // Weather drifts year-to-year — emergent climate variation
-      driftWeather();
-      // Live gene drift narration — report meaningful shifts from founder genes
-      if (state.founderGenes && state.year > 1) {
-        const adults = state.cats.filter(c => !c.dying && c.stage !== 'kitten');
-        if (adults.length >= 4) {
-          const phrases = {
-            boldness:    ['bolder', 'more timid'],
-            sociability: ['more social', 'more aloof'],
-            playfulness: ['more playful', 'more serious'],
-            aggression:  ['more aggressive', 'gentler'],
-            energy:      ['more energetic', 'mellower'],
-            appetite:    ['hungrier eaters', 'lighter eaters'],
-          };
-          const shifts = [];
-          for (const t of Object.keys(phrases)) {
-            const curMean = adults.reduce((s,c) => s + c.genes[t], 0) / adults.length;
-            const founderMean = state.founderGenes[t];
-            const delta = curMean - founderMean;
-            const lastDelta = state.lastDriftAnnouncement[t] || 0;
-            // Only announce if drift exceeds 0.12 AND has changed substantially since last announcement
-            if (Math.abs(delta) > 0.12 && Math.abs(delta - lastDelta) > 0.06) {
-              shifts.push({trait: t, delta, phrase: phrases[t][delta > 0 ? 0 : 1]});
-              state.lastDriftAnnouncement[t] = delta;
-            }
-          }
-          // Body size drift
-          const curBody = adults.reduce((s,c) => s + (c.bodyScale||1), 0) / adults.length;
-          const bodyDelta = curBody - state.founderGenes.bodyScale;
-          const lastBodyDelta = state.lastDriftAnnouncement.bodyScale || 0;
-          if (Math.abs(bodyDelta) > 0.08 && Math.abs(bodyDelta - lastBodyDelta) > 0.04) {
-            shifts.push({trait: 'bodyScale', delta: bodyDelta, phrase: bodyDelta > 0 ? 'larger' : 'smaller'});
-            state.lastDriftAnnouncement.bodyScale = bodyDelta;
-          }
-          // Announce the biggest shift this year
-          if (shifts.length) {
-            shifts.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
-            const top = shifts[0];
-            logEvent(`These cats are becoming ${top.phrase} than their forebears.`, 'event');
-          }
-        }
-      }
-    }
 
-    // Auto-spawn food at feeding spots — burst-refills to target so late game is sustainable
-    if (state.simTime - state.lastAutoFood > FOOD_SPAWN_INTERVAL) {
-      const livingPop = state.cats.filter(c => !c.dying).length;
-      // Add additional feeding spots as the colony grows so cats don't all pile on the same few
-      const desiredSpots = livingPop >= 35 ? 6 : livingPop >= 22 ? 5 : livingPop >= 12 ? 4 : 3;
-      while (state.feedSpots.length < desiredSpots) {
-        const ang = Math.random() * Math.PI * 2;
-        const radius = Math.min(arenaW, arenaH) * (0.18 + Math.random()*0.22);
-        state.feedSpots.push({
-          x: clamp(arenaW/2 + Math.cos(ang)*radius, 60, arenaW-60),
-          y: clamp(arenaH/2 + Math.sin(ang)*radius, 130, arenaH-60),
-        });
-      }
-      // Environmental carrying capacity — food production has hard limits.
-      // Lower cap = smaller colony = each death matters = visible evolution.
-      // colonyScale (player setting) shifts the whole equilibrium: smaller = faster evolution.
-      const colonyScale = state.colonyScale || 1;
-      const areaCap = Math.max(15, Math.floor((arenaW * arenaH) / 20000 * colonyScale));
-      let envMult = 1;
-      if (state.season === 'winter') envMult *= 0.5;
-      else if (state.season === 'fall') envMult *= 0.8;
-      else if (state.season === 'summer') envMult *= 1.1;
-      if (state.activeEvent === 'plentiful') envMult *= 1.6;
-      else if (state.activeEvent === 'drought') envMult *= 0.35;
-      else if (state.activeEvent === 'harshWinter') envMult *= 0.6;
-      const envCap = Math.max(6, Math.floor(areaCap * envMult));
-      // Target = whichever is LOWER: per-cat demand OR environmental ceiling.
-      // When pop exceeds env capacity, food gets scarce — starvation deaths cull naturally.
-      const demand = Math.ceil(livingPop * FOOD_PER_CAT);
-      const targetFood = Math.max(FOOD_TARGET_MIN, Math.min(demand, envCap));
-      const shortfall = targetFood - state.food.length;
-      if (shortfall > 0) {
-        const dynamicBurst = Math.max(FOOD_BURST_MAX, Math.ceil(livingPop / 25));
-        const toSpawn = Math.min(shortfall, dynamicBurst);
-        for (let i = 0; i < toSpawn; i++) {
-          if (Math.random() < FOOD_RANDOM_CHANCE) {
-            dropFood(rand(70, arenaW-70), rand(150, arenaH-70));
-          } else {
-            const spot = state.feedSpots[Math.floor(Math.random()*state.feedSpots.length)];
-            const ang = Math.random() * Math.PI * 2;
-            const r = 12 + Math.random() * FOOD_SPOT_JITTER;
-            dropFood(
-              clamp(spot.x + Math.cos(ang)*r, 50, arenaW-50),
-              clamp(spot.y + Math.sin(ang)*r, 130, arenaH-50)
-            );
-          }
-        }
-      }
-      state.lastAutoFood = state.simTime;
-    }
+    // Advance the simulation (pure — no DOM)
+    const { sampledHistory } = sim.step(dt);
 
-    // Remove expired food
-    state.food = state.food.filter(f => state.simTime - f.bornAt < FOOD_LIFETIME && f.amount > 0.01);
-
-    // Rebuild spatial index once before any neighbor queries this tick
-    rebuildSpatialIndex();
-
-    // Update cats
-    for (const cat of state.cats) updateCat(cat, dt);
-    // Remove dead-faded
-    state.cats = state.cats.filter(c => !c._remove);
-
-    // Sample history
-    if (Math.floor(state.simTime/2) > state.history.length) {
-      state.history.push({day: state.simTime, pop: state.cats.length, born: state.totalBorn, died: state.totalDied});
-      state.diversityHistory.push(computeDiversity());
-      // Gene drift sample — mean of each behavioral gene across living adults
-      const adults = state.cats.filter(c => !c.dying && c.stage !== 'kitten');
-      if (adults.length > 0) {
-        const traits = ['boldness','sociability','playfulness','aggression','energy','appetite'];
-        for (const t of traits) {
-          const mean = adults.reduce((s,c) => s + c.genes[t], 0) / adults.length;
-          state.geneHistory[t].push(mean);
-        }
-        const sizeMean = adults.reduce((s,c) => s + (c.bodyScale||1), 0) / adults.length;
-        state.geneHistory.bodyScale.push(sizeMean);
-      } else {
-        // Carry forward last value (or push 0.5)
-        for (const t of ['boldness','sociability','playfulness','aggression','energy','appetite']) {
-          const last = state.geneHistory[t];
-          last.push(last.length ? last[last.length-1] : 0.5);
-        }
-        const last = state.geneHistory.bodyScale;
-        last.push(last.length ? last[last.length-1] : 1);
-      }
-      // Update visible evo tracker if open
+    // Refresh the evo tracker when a new history sample landed and it's open
+    if (sampledHistory) {
       const tr = document.getElementById('evoTracker');
       if (tr && !tr.classList.contains('hidden')) renderEvoTracker();
     }
 
-    // Check end — sim ends when ≤1 cat alive (a lone cat can't breed)
-    const livingCount = state.cats.filter(c => !c.dying).length;
+    // End detection. The sim's biological end is livingCount <= 1; the web layer
+    // adds an animation grace period so dying fades finish on screen.
+    const livingCount = sim.livingCount();
     if (livingCount <= 1) {
-      // wait for dying animations to finish, then a brief grace for the lone cat
       state._endTimer = (state._endTimer || 0) + dt * SIM_DAY_REAL_SEC / state.speed; // real seconds
       const allDead = livingCount === 0 && state.cats.length === 0;
       const loneSurvivor = livingCount === 1 && state.cats.length === 1;
-      // End immediately if all dying-fades are done, OR after 3 real seconds with a lone survivor
       if (allDead) endSimulation();
       else if (loneSurvivor && state._endTimer > 3) {
-        // mark the survivor as dying ('alone') so its fade plays into the end screen
         const lone = state.cats.find(c => !c.dying);
         if (lone) {
-          logEvent(`${lone.name} is the last cat. The line ends.`, 'death');
+          sim.logEvent(`${lone.name} is the last cat. The line ends.`, 'death');
           triggerDeath(lone, 'alone');
         }
       }
@@ -1923,16 +1755,14 @@ function tick(time) {
       state._endTimer = 0;
     }
 
-    // UI updates
+    // Log + UI
+    renderLog();
     document.getElementById('dayCount').textContent = Math.floor(state.simTime);
-    document.getElementById('popCount').textContent = state.cats.filter(c=>!c.dying).length;
-    // Week sub: "spring · Y4"
+    document.getElementById('popCount').textContent = livingCount;
     const weekSub = document.getElementById('weekSub');
     weekSub.textContent = `${state.season} · Y${state.year}`;
     weekSub.className = 'stat-sub ' + state.season;
-    // Cat sub: "Gen 3"
     document.getElementById('catSub').textContent = 'Gen ' + state.generation;
-    // Event banner
     const banner = document.getElementById('eventBanner');
     if (state.activeEvent) {
       banner.textContent = state.activeEventMessage;
@@ -2762,6 +2592,7 @@ function restart() {
   state.diversityHistory = [];
   state.geneHistory = { boldness:[], sociability:[], playfulness:[], aggression:[], energy:[], appetite:[], bodyScale:[] };
   state.deceased = [];
+  state.deathCauses = {};
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
   state.founders = [];
   parentsById.clear();
@@ -2933,6 +2764,7 @@ function beginSim() {
   state.eventTimeline = [];
   state.climate = makeStartingWeather();
   state.deceased = [];
+  state.deathCauses = {};
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
   state.colonyScale = 1;
 

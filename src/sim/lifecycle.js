@@ -332,6 +332,8 @@ export function triggerDeath(sim, cat, reason, { logEvent }) {
   if (!r.mostFights   || snapshot.fightCount > r.mostFights.fightCount) r.mostFights = snapshot;
   if (!r.mostInbred   || snapshot.inbreedF   > r.mostInbred.inbreedF)   r.mostInbred = snapshot;
   if (!r.biggest      || snapshot.bodyScale  > r.biggest.bodyScale)     r.biggest = snapshot;
+  // Running death-cause histogram (deceased array is capped, so we tally here).
+  sim.deathCauses[reason] = (sim.deathCauses[reason] || 0) + 1;
   // Push to deceased but cap the array — only recent dead are kept for pedigree lookups.
   sim.deceased.push(snapshot);
   if (sim.deceased.length > 400) sim.deceased.shift();

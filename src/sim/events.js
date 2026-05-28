@@ -1,5 +1,20 @@
 import { rand, clamp } from './util.js';
 
+// ─── LOG CLASSIFICATION ───────────────────────────────────────
+// Event-type priorities for high-pop filtering. 'major' tier passes always.
+export const EVENT_PRIORITY = { 'event': 1, 'birth': 2, 'mate': 2, 'death': 2, 'major': 5 };
+// Substrings that mark colony-level messages that should always pass even at high pop.
+export const MAJOR_KEYWORDS = ['Year ', 'Spring returns', 'Summer arrives', 'Fall sets in', 'Winter falls',
+  'predator stalks', 'harsh winter', 'plentiful', 'drought', 'epidemic', 'Illness sweeps',
+  'poor harvest', 'abundant fall', 'These cats are becoming'];
+
+export function isMajorEvent(text) {
+  for (let i = 0; i < MAJOR_KEYWORDS.length; i++) {
+    if (text.indexOf(MAJOR_KEYWORDS[i]) !== -1) return true;
+  }
+  return false;
+}
+
 // Season helper: 52 weeks/year, 13 weeks/season.
 export function deriveSeason(simTime) {
   const week = Math.floor(simTime) % 52;

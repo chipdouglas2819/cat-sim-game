@@ -1,13 +1,24 @@
-import { mulberry32, setRandomSource } from './util.js';
+import {
+  SIM_DAY_REAL_SEC,
+  FOOD_SPAWN_INTERVAL, FOOD_PER_CAT, FOOD_TARGET_MIN, FOOD_BURST_MAX,
+  FOOD_RANDOM_CHANCE, FOOD_SPOT_JITTER, FOOD_LIFETIME,
+} from './constants.js';
+import { mulberry32, setRandomSource, rand, clamp } from './util.js';
+import {
+  deriveSeason, deriveYear, rollSeasonalEvent, driftWeather, makeStartingWeather,
+  isMajorEvent, EVENT_PRIORITY,
+} from './events.js';
+import { rebuildSpatialIndex } from './spatial.js';
+import { dropFood, triggerDeath } from './lifecycle.js';
+import { updateCat } from './ai.js';
+import { computeDiversity } from './diversity.js';
 
-// Owns all simulation state. The live web game and the (future) headless bench
-// harness both construct a Simulation and share the same step/snapshot surface,
+const BEHAVIORAL_TRAITS = ['boldness', 'sociability', 'playfulness', 'aggression', 'energy', 'appetite'];
+
+// Owns all simulation state AND the tick loop. The live web game and the headless
+// bench harness both construct a Simulation and call step(dt) — same code path —
 // so a behavior verified on the bench is the same behavior the player sees.
-//
-// Phase 1c-i scope: this class only OWNS state. The tick loop and AI/lifecycle
-// helpers still live inline in colony.html and read/write `sim.<field>` directly.
-// Phase 1c-ii will move those into methods so the bench can step the sim
-// without any DOM dependency.
+// step() never touches the DOM; the web layer renders sim.cats after each step.
 export class Simulation {
   constructor(config = {}) {
     // ─── CONFIG ──────────────────────────────────────────────
@@ -61,10 +72,14 @@ export class Simulation {
     };
     this.notableEvents = [];
     this.deceased = [];                    // snapshots of every cat who died (capped — see triggerDeath)
+    this.deathCauses = {};                 // running histogram: reason → count
     this.founders = [];                    // ids of the starting pair
+    this.founderGenes = null;              // captured at start for drift comparison
+    this.lastDriftAnnouncement = {};       // last-narrated drift per trait
     this.firsts = {};                      // {phenotypeKey: catName}
     this.activeEvent = null;
     this.activeEventMessage = '';
+    this.climate = makeStartingWeather();  // weather-bias multipliers; drifts yearly
     this.eventLog = [];                    // history of events for end screen
     this.eventTimeline = [];               // {simTime, event, season, message} for chart markers
 
@@ -81,6 +96,7 @@ export class Simulation {
     this.starter = { A: null, B: null };   // staged starter cat configs
     this.endCause = '';
     this.endedByUser = false;
+    this._endTimer = 0;                    // real-seconds grace before ending (web only)
 
     // ─── INDEXES (formerly module-level Maps) ────────────────
     // These were globals: catById, parentsById, spatialGrid. Living on the
@@ -89,5 +105,242 @@ export class Simulation {
     this.catById = new Map();              // O(1) cat lookup by id
     this.parentsById = new Map();          // catId -> [momId, dadId] | null
     this.spatialGrid = new Map();          // "cx,cy" → array of cats
+
+    // ─── SIDE-EFFECT SINKS ───────────────────────────────────
+    // Passed to event/AI/lifecycle helpers so they can log + kill without
+    // importing this module (avoids a dependency cycle) and without touching
+    // the DOM. Pure: logEvent appends to this.events, triggerDeath updates
+    // sim state. The web layer renders this.events on its own cadence.
+    this._sinks = {
+      logEvent: (text, type) => this.logEvent(text, type),
+      triggerDeath: (cat, reason) => triggerDeath(this, cat, reason, this._sinks),
+    };
+  }
+
+  // Append an event to the log, with the same pop-based filtering the live
+  // game used (so the bench's event list matches what the player would see).
+  logEvent(text, type = 'event') {
+    const pop = this.cats.length;
+    // Above 500 cats: suppress everything except colony-level events
+    if (pop > 500 && !isMajorEvent(text)) return;
+    // Mid pop (200-500): drop low-priority events probabilistically
+    if (pop > 200 && pop <= 500 && (EVENT_PRIORITY[type] || 1) < 2 && rand() < 0.6) return;
+    this.events.unshift({ simTime: this.simTime, text, type });
+    if (this.events.length > 40) this.events.pop();
+  }
+
+  // Advance the simulation by dt sim-weeks. Pure: no DOM, no rendering.
+  // Returns { sampledHistory } so the web layer knows when to refresh charts.
+  step(dt) {
+    const sinks = this._sinks;
+    this.simTime += dt;
+
+    // ─── Season + year tracking ──────────────────────────────
+    const newSeason = deriveSeason(this.simTime);
+    const newYear = deriveYear(this.simTime);
+    if (newSeason !== this.season) {
+      this.season = newSeason;
+      const seasonMsg = newSeason === 'spring' ? 'Spring returns. Breeding season begins.' :
+                        newSeason === 'summer' ? 'Summer arrives.' :
+                        newSeason === 'fall' ? 'Fall sets in. Breeding season ends.' :
+                        'Winter falls over the colony.';
+      this.logEvent(seasonMsg, 'event');
+      rollSeasonalEvent(this, newSeason, sinks);
+    }
+    if (newYear !== this.year) {
+      this.year = newYear;
+      this.logEvent(`Year ${newYear} begins.`, 'event');
+      driftWeather(this);
+      this._narrateDrift();
+    }
+
+    // ─── Food spawning ───────────────────────────────────────
+    if (this.simTime - this.lastAutoFood > FOOD_SPAWN_INTERVAL) {
+      const livingPop = this.cats.filter(c => !c.dying).length;
+      // Add additional feeding spots as the colony grows so cats don't all pile up
+      const desiredSpots = livingPop >= 35 ? 6 : livingPop >= 22 ? 5 : livingPop >= 12 ? 4 : 3;
+      while (this.feedSpots.length < desiredSpots) {
+        const ang = rand() * Math.PI * 2;
+        const radius = Math.min(this.arenaW, this.arenaH) * (0.18 + rand() * 0.22);
+        this.feedSpots.push({
+          x: clamp(this.arenaW / 2 + Math.cos(ang) * radius, 60, this.arenaW - 60),
+          y: clamp(this.arenaH / 2 + Math.sin(ang) * radius, 130, this.arenaH - 60),
+        });
+      }
+      // Environmental carrying capacity — food production has hard limits.
+      // colonyScale shifts the whole equilibrium: smaller = faster evolution.
+      const colonyScale = this.colonyScale || 1;
+      const areaCap = Math.max(15, Math.floor((this.arenaW * this.arenaH) / 20000 * colonyScale));
+      let envMult = 1;
+      if (this.season === 'winter') envMult *= 0.5;
+      else if (this.season === 'fall') envMult *= 0.8;
+      else if (this.season === 'summer') envMult *= 1.1;
+      if (this.activeEvent === 'plentiful') envMult *= 1.6;
+      else if (this.activeEvent === 'drought') envMult *= 0.35;
+      else if (this.activeEvent === 'harshWinter') envMult *= 0.6;
+      const envCap = Math.max(6, Math.floor(areaCap * envMult));
+      // Target = whichever is LOWER: per-cat demand OR environmental ceiling.
+      const demand = Math.ceil(livingPop * FOOD_PER_CAT);
+      const targetFood = Math.max(FOOD_TARGET_MIN, Math.min(demand, envCap));
+      const shortfall = targetFood - this.food.length;
+      if (shortfall > 0) {
+        const dynamicBurst = Math.max(FOOD_BURST_MAX, Math.ceil(livingPop / 25));
+        const toSpawn = Math.min(shortfall, dynamicBurst);
+        for (let i = 0; i < toSpawn; i++) {
+          if (rand() < FOOD_RANDOM_CHANCE) {
+            dropFood(this, rand(70, this.arenaW - 70), rand(150, this.arenaH - 70));
+          } else {
+            const spot = this.feedSpots[Math.floor(rand() * this.feedSpots.length)];
+            const ang = rand() * Math.PI * 2;
+            const r = 12 + rand() * FOOD_SPOT_JITTER;
+            dropFood(
+              this,
+              clamp(spot.x + Math.cos(ang) * r, 50, this.arenaW - 50),
+              clamp(spot.y + Math.sin(ang) * r, 130, this.arenaH - 50)
+            );
+          }
+        }
+      }
+      this.lastAutoFood = this.simTime;
+    }
+
+    // Remove expired food
+    this.food = this.food.filter(f => this.simTime - f.bornAt < FOOD_LIFETIME && f.amount > 0.01);
+
+    // Rebuild spatial index once before any neighbor queries this tick
+    rebuildSpatialIndex(this);
+
+    // Update cats
+    for (const cat of this.cats) updateCat(this, cat, dt, sinks);
+    // Remove dead-faded
+    this.cats = this.cats.filter(c => !c._remove);
+
+    // Sample history (every 2 sim-weeks)
+    let sampledHistory = false;
+    if (Math.floor(this.simTime / 2) > this.history.length) {
+      sampledHistory = true;
+      this.history.push({ day: this.simTime, pop: this.cats.length, born: this.totalBorn, died: this.totalDied });
+      this.diversityHistory.push(computeDiversity(this));
+      const adults = this.cats.filter(c => !c.dying && c.stage !== 'kitten');
+      if (adults.length > 0) {
+        for (const t of BEHAVIORAL_TRAITS) {
+          const mean = adults.reduce((s, c) => s + c.genes[t], 0) / adults.length;
+          this.geneHistory[t].push(mean);
+        }
+        const sizeMean = adults.reduce((s, c) => s + (c.bodyScale || 1), 0) / adults.length;
+        this.geneHistory.bodyScale.push(sizeMean);
+      } else {
+        // Carry forward last value (or a sensible default)
+        for (const t of BEHAVIORAL_TRAITS) {
+          const last = this.geneHistory[t];
+          last.push(last.length ? last[last.length - 1] : 0.5);
+        }
+        const last = this.geneHistory.bodyScale;
+        last.push(last.length ? last[last.length - 1] : 1);
+      }
+    }
+
+    return { sampledHistory };
+  }
+
+  // Live gene-drift narration — report meaningful shifts from founder genes.
+  // Called once per year from step(). Mutates lastDriftAnnouncement, logs.
+  _narrateDrift() {
+    if (!this.founderGenes || this.year <= 1) return;
+    const adults = this.cats.filter(c => !c.dying && c.stage !== 'kitten');
+    if (adults.length < 4) return;
+    const phrases = {
+      boldness:    ['bolder', 'more timid'],
+      sociability: ['more social', 'more aloof'],
+      playfulness: ['more playful', 'more serious'],
+      aggression:  ['more aggressive', 'gentler'],
+      energy:      ['more energetic', 'mellower'],
+      appetite:    ['hungrier eaters', 'lighter eaters'],
+    };
+    const shifts = [];
+    for (const t of Object.keys(phrases)) {
+      const curMean = adults.reduce((s, c) => s + c.genes[t], 0) / adults.length;
+      const founderMean = this.founderGenes[t];
+      const delta = curMean - founderMean;
+      const lastDelta = this.lastDriftAnnouncement[t] || 0;
+      if (Math.abs(delta) > 0.12 && Math.abs(delta - lastDelta) > 0.06) {
+        shifts.push({ trait: t, delta, phrase: phrases[t][delta > 0 ? 0 : 1] });
+        this.lastDriftAnnouncement[t] = delta;
+      }
+    }
+    const curBody = adults.reduce((s, c) => s + (c.bodyScale || 1), 0) / adults.length;
+    const bodyDelta = curBody - this.founderGenes.bodyScale;
+    const lastBodyDelta = this.lastDriftAnnouncement.bodyScale || 0;
+    if (Math.abs(bodyDelta) > 0.08 && Math.abs(bodyDelta - lastBodyDelta) > 0.04) {
+      shifts.push({ trait: 'bodyScale', delta: bodyDelta, phrase: bodyDelta > 0 ? 'larger' : 'smaller' });
+      this.lastDriftAnnouncement.bodyScale = bodyDelta;
+    }
+    if (shifts.length) {
+      shifts.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      this.logEvent(`These cats are becoming ${shifts[0].phrase} than their forebears.`, 'event');
+    }
+  }
+
+  // Count living (non-dying) cats. A run is biologically over at <= 1
+  // (a lone cat can't breed). The web layer adds an animation grace period;
+  // the bench can just check this after each step.
+  livingCount() {
+    let n = 0;
+    for (const c of this.cats) if (!c.dying) n++;
+    return n;
+  }
+
+  // Aggregate metrics for the bench harness / analysis. Computed over living
+  // adults (the population that's actually reproducing + being selected).
+  snapshot() {
+    const adults = this.cats.filter(c => !c.dying && c.stage !== 'kitten');
+    const n = adults.length;
+    const geneMean = {};
+    const geneStd = {};
+    for (const t of BEHAVIORAL_TRAITS) {
+      if (n === 0) { geneMean[t] = null; geneStd[t] = null; continue; }
+      const mean = adults.reduce((s, c) => s + c.genes[t], 0) / n;
+      const variance = adults.reduce((s, c) => { const d = c.genes[t] - mean; return s + d * d; }, 0) / n;
+      geneMean[t] = mean;
+      geneStd[t] = Math.sqrt(variance);
+    }
+    const bodyMean = n ? adults.reduce((s, c) => s + (c.bodyScale || 1), 0) / n : null;
+    const meanF = n ? adults.reduce((s, c) => s + (c.inbreedF || 0), 0) / n : null;
+
+    return {
+      simTime: this.simTime,
+      year: this.year,
+      season: this.season,
+      generation: this.generation,
+      population: this.livingCount(),
+      adults: n,
+      totalBorn: this.totalBorn,
+      totalDied: this.totalDied,
+      stillborn: this.stillborn,
+      diseaseOutbreaks: this.diseaseOutbreaks,
+      geneMean,
+      geneStd,
+      bodyMean,
+      meanInbreedingF: meanF,
+      diversity: computeDiversity(this),
+      activeEvent: this.activeEvent,
+      climate: this.climate ? { ...this.climate } : null,
+      deathCauses: { ...this.deathCauses },
+      founderGenes: this.founderGenes ? { ...this.founderGenes } : null,
+    };
+  }
+
+  // Run forward N sim-years headlessly with a fixed timestep. For the bench.
+  // Stops early if the colony dies out. Returns the final snapshot.
+  runYears(years, { dt = 0.5, onYear = null } = {}) {
+    const endTime = this.simTime + years * 52;
+    let lastYear = this.year;
+    this.phase = 'running';
+    while (this.simTime < endTime) {
+      this.step(dt);
+      if (onYear && this.year !== lastYear) { lastYear = this.year; onYear(this); }
+      if (this.livingCount() <= 1) { this.phase = 'ended'; break; }
+    }
+    return this.snapshot();
   }
 }
