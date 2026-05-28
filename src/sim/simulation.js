@@ -163,6 +163,12 @@ export class Simulation {
     return { A, B };
   }
 
+  // Kill a cat through the sim's own sinks. Used by the web layer's end-check
+  // (the lone-survivor death) so it doesn't need its own sink plumbing.
+  kill(cat, reason) {
+    triggerDeath(this, cat, reason, this._sinks);
+  }
+
   // Append an event to the log, with the same pop-based filtering the live
   // game used (so the bench's event list matches what the player would see).
   logEvent(text, type = 'event') {

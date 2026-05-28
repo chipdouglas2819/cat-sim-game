@@ -1108,90 +1108,28 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
 //   COLONY — cat genetics & behavior simulator
 // ════════════════════════════════════════════════════════════════
 
+// The web layer (this file) is now just setup UI, canvas rendering, the
+// inspector/charts, and the tick() that drives sim.step(dt). All sim-affecting
+// logic lives in src/sim/. These imports are only what the web layer still
+// uses directly; everything else moved into the Simulation.
 import {
-  SIM_DAY_REAL_SEC, KITTEN_DAYS, JUVENILE_DAYS, ADULT_END, SENIOR_END,
-  PREGNANCY_DAYS, BREED_COOLDOWN, ESTRUS_CYCLE_WEEKS, ESTRUS_DURATION,
-  FOOD_LIFETIME, FEED_SPOTS_COUNT, FOOD_SPAWN_INTERVAL, FOOD_PER_CAT,
-  FOOD_TARGET_MIN, FOOD_BURST_MAX, FOOD_RANDOM_CHANCE, FOOD_SPOT_JITTER,
-  POP_SOFT_TARGET_BASE, POP_HARD_CEILING,
-  NAME_POOL,
+  SIM_DAY_REAL_SEC, KITTEN_DAYS, ADULT_END, SENIOR_END,
+  PREGNANCY_DAYS, FOOD_LIFETIME, NAME_POOL,
 } from './src/sim/constants.js';
-
-import {
-  rand, randInt, pick, clamp, dist, gauss, lightenHex,
-} from './src/sim/util.js';
-
-import {
-  rollGenes, inheritGenes, calculatePhenotype, patternName, genesToTags,
-} from './src/sim/genetics.js';
-
+import { pick, clamp } from './src/sim/util.js';
+import { rollGenes, calculatePhenotype, genesToTags } from './src/sim/genetics.js';
+import { makeStartingWeather } from './src/sim/events.js';
+import { dropFood as _dropFood } from './src/sim/lifecycle.js';
 import { Simulation } from './src/sim/simulation.js';
 
-import {
-  deriveSeason, deriveYear, makeStartingWeather,
-  isBreedingSeason as _isBreedingSeason,
-  driftWeather as _driftWeather,
-  rollSeasonalEvent as _rollSeasonalEvent,
-  applyEnvironmentalPressure as _applyEnvironmentalPressure,
-} from './src/sim/events.js';
-
-import {
-  SPATIAL_CELL,
-  rebuildSpatialIndex as _rebuildSpatialIndex,
-  forCatsNear as _forCatsNear,
-  findNearest as _findNearest,
-  findNearestFood as _findNearestFood,
-  localDensity as _localDensity,
-} from './src/sim/spatial.js';
-
-import { computeDiversity as _computeDiversity } from './src/sim/diversity.js';
-
-import {
-  ageStage,
-  ancestors as _ancestors,
-  inbreedingCoefficient as _inbreedingCoefficient,
-  recordFirsts as _recordFirsts,
-  recordParents as _recordParents,
-  createCat as _createCat,
-  dropFood as _dropFood,
-  mate as _mate,
-  giveBirth as _giveBirth,
-  triggerDeath as _triggerDeath,
-} from './src/sim/lifecycle.js';
-
-import {
-  moveToward as _moveToward,
-  decideInteraction as _decideInteraction,
-  chooseAction as _chooseAction,
-  updateCat as _updateCat,
-  executeState as _executeState,
-} from './src/sim/ai.js';
-
 // ─── STATE ────────────────────────────────────────────────────
-// The Simulation instance owns all sim state. `state` is an alias so existing
-// state.X access keeps working unchanged. Phase 1c-ii will start moving the
-// tick loop and helpers into Simulation methods so the bench harness can
-// step a sim with no DOM.
+// The Simulation owns all sim state AND the tick loop (sim.step()). `state` is
+// an alias so the remaining web code keeps using state.X unchanged.
 const sim = new Simulation();
 const state = sim;
-
-// ─── UTILS ────────────────────────────────────────────────────
-// rand, randInt, pick, clamp, dist, gauss, lightenHex imported from ./src/sim/util.js
-
-// ─── GENES ────────────────────────────────────────────────────
-// rollGenes, inheritGenes, calculatePhenotype, patternName, genesToTags
-// imported from ./src/sim/genetics.js
-
-// ─── CATS ─────────────────────────────────────────────────────
-// Lifecycle helpers (createCat, recordFirsts, ageStage, recordParents,
-// ancestors, inbreedingCoefficient) live in ./src/sim/lifecycle.js.
-// parentsById alias kept here because some non-lifecycle inline code reads it.
-const parentsById = sim.parentsById;   // catId -> [momId, dadId] | null
-function createCat(opts) { return _createCat(sim, opts); }
-function recordFirsts(cat) { _recordFirsts(sim, cat); }
-function recordParents(catId, parents) { _recordParents(sim, catId, parents); }
-function ancestors(catId, depth = 4, map = new Map(), gen = 0) { return _ancestors(sim, catId, depth, map, gen); }
-function inbreedingCoefficient(momId, dadId) { return _inbreedingCoefficient(sim, momId, dadId); }
+// Aliases for the inspector (catById.get) and restart (parentsById.clear).
+const catById = sim.catById;
+const parentsById = sim.parentsById;
 
 // ─── DRAWING CATS ─────────────────────────────────────────────
 // Compute trait-driven color tint for a cat — used to subtly shift body hue
@@ -1620,56 +1558,11 @@ function drawArena(ctx) {
   ctx.fillRect(0,0,arenaW,arenaH);
 }
 
-// ─── POPULATION DYNAMICS ──────────────────────────────────────
-// Density stress around a cat — used to modify breeding willingness, aggression
-// localDensity wrapper — sim-aware version lives in spatial.js
-function localDensity(cat) { return _localDensity(sim, cat); }
-
-// Season + event helpers imported from ./src/sim/events.js.
-// rollSeasonalEvent + applyEnvironmentalPressure receive sim + a {logEvent,
-// triggerDeath} bag because they trigger side-effects the web layer needs to
-// observe (DOM log, dying animations). The bench harness will pass minimal
-// implementations that just append to sim.events. Local wrappers below keep
-// existing call sites (isBreedingSeason(), rollSeasonalEvent(season), etc.)
-// working unchanged.
-const eventSinks = {
-  logEvent: (msg, type) => logEvent(msg, type),
-  triggerDeath: (cat, reason) => triggerDeath(cat, reason),
-};
-function isBreedingSeason() { return _isBreedingSeason(sim); }
-function driftWeather() { _driftWeather(sim); }
-function rollSeasonalEvent(season) { _rollSeasonalEvent(sim, season, eventSinks); }
-function applyEnvironmentalPressure(cat, dt) { _applyEnvironmentalPressure(sim, cat, dt, eventSinks); }
-
-// ─── BEHAVIOR ─────────────────────────────────────────────────
-// Spatial index + neighbor queries live in ./src/sim/spatial.js.
-// catById is owned by sim; alias here for inline code that reads it directly
-// (mom/dad lookups in update/birth/death paths).
-const catById = sim.catById;
-// Local wrappers below preserve existing call-site signatures.
-function rebuildSpatialIndex() { _rebuildSpatialIndex(sim); }
-function forCatsNear(x, y, r, callback) { _forCatsNear(sim, x, y, r, callback); }
-function findNearest(cat, predicate, maxDist = Infinity) { return _findNearest(sim, cat, predicate, maxDist); }
-function findNearestFood(cat) { return _findNearestFood(sim, cat); }
-
-// AI imported from ./src/sim/ai.js. Wrappers preserve call-site signatures.
-function chooseAction(cat) { _chooseAction(sim, cat); }
-function decideInteraction(a, b) { return _decideInteraction(a, b); }
-function updateCat(cat, dt) { _updateCat(sim, cat, dt, eventSinks); }
-function executeState(cat, dt) { _executeState(sim, cat, dt, eventSinks); }
-function moveToward(cat, tx, ty, speed) { _moveToward(cat, tx, ty, speed); }
-// ─── UPDATE / EXECUTE / MOVE ──────────────────────────────────
-// All five — chooseAction, decideInteraction, updateCat, executeState,
-// moveToward — now live in ./src/sim/ai.js. Wrappers above route through.
-
-// ─── BREEDING ─────────────────────────────────────────────────
-// mate / giveBirth / triggerDeath live in ./src/sim/lifecycle.js.
-// Wrappers pass sim + the eventSinks bag so logEvent goes through the web
-// layer's DOM-coupled version.
-function mate(a, b) { _mate(sim, a, b, eventSinks); }
-function giveBirth(mom) { _giveBirth(sim, mom, eventSinks); }
-// ─── DEATH ────────────────────────────────────────────────────
-function triggerDeath(cat, reason) { _triggerDeath(sim, cat, reason, eventSinks); }
+// localDensity, spatial queries, AI (chooseAction/updateCat/executeState/
+// moveToward), mating, birth, environmental pressure, and seasonal events all
+// live in src/sim/ and run inside sim.step(). The web layer triggers exactly
+// one sim action directly — the lone-survivor death in the end-check — via
+// sim.kill().
 
 function drawDying(ctx, cat) {
   const t = cat.dyingT;
@@ -1698,11 +1591,8 @@ function drawDying(ctx, cat) {
 }
 
 // ─── EVENTS / LOG ─────────────────────────────────────────────
-// Filtering + sim.events management live in Simulation.logEvent (sim-side, so
-// the bench's event list matches the player's). This wrapper just forwards;
-// the log is re-rendered each frame from tick().
-function logEvent(text, type = 'event') { sim.logEvent(text, type); }
-
+// Event filtering + sim.events live in Simulation.logEvent. The web layer only
+// renders the log (re-rendered each frame from tick()); it logs via sim.logEvent.
 function renderLog() {
   const wrap = document.getElementById('log');
   wrap.innerHTML = '';
@@ -1748,7 +1638,7 @@ function tick(time) {
         const lone = state.cats.find(c => !c.dying);
         if (lone) {
           sim.logEvent(`${lone.name} is the last cat. The line ends.`, 'death');
-          triggerDeath(lone, 'alone');
+          sim.kill(lone, 'alone');
         }
       }
     } else if (state._endTimer) {
@@ -1792,10 +1682,6 @@ function render() {
     else drawCat(ctx, cat, cat.x, cat.y, 1, cat.dir);
   }
 }
-
-// ─── DIVERSITY ────────────────────────────────────────────────
-// computeDiversity wrapper — implementation lives in ./src/sim/diversity.js
-function computeDiversity() { return _computeDiversity(sim); }
 
 // ─── INPUT ────────────────────────────────────────────────────
 function onArenaTap(e) {
