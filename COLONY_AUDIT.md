@@ -80,5 +80,60 @@ Fix: maternal grief float now skipped when population exceeds 500.
 - A3 (behavioral diversity metric) — needs new chart series. The diversity
   module already computes behavioral spread, but the chart only plots the
   blended index. Could split into two series.
-- M1 (population won't stay low) — needs tuning investigation, best done with
-  the headless harness once Phase 2 lands.
+
+---
+
+# Bench findings — evolution / balance (2026-05-28)
+
+Ran headless sweeps (bench/run.js, bench/analyze.js, bench/environments.js):
+a colonyScale sweep (4 scales × 24 seeds × 22yr) and a forced-environment
+battery (6 environments × 12–30 seeds). Verdict: **you currently CANNOT
+witness evolution in most directions.** Findings, worst first:
+
+### B1. colonyScale floor bug — **FIXED**
+Food-capacity floors were flat (`max(15,…)`, `max(6,…)`, `FOOD_TARGET_MIN=4`),
+clamping every colonyScale ≤ ~0.6 to identical capacity. Scales 0.1/0.25/0.5
+produced byte-identical runs. Fixed: floors scale with colonyScale; medPop now
+13/18/239/550 across 0.1/0.25/0.5/1.0. Scale 1 (live default) unchanged.
+
+### B2. Starvation drowns out all other selection — **OPEN (design)**
+Starvation = 82–87% of all deaths. Predator 1%, harsh winter 1%, drought 0%,
+plague 0%. The environmental events that are supposed to create trait
+trade-offs cause ~3% of deaths combined — far too weak to steer evolution.
+The only real selective pressure is "don't starve" → small body, low appetite.
+
+### B3. The environmental trade-offs barely work / several are broken — **OPEN (design)**
+Forcing an environment to dominate (4× weight) still barely moves traits:
+- predator does NOT select for aggression (should) — flat
+- predator does NOT meaningfully select against boldness (should) — flat
+- epidemic selects slightly FOR sociability (BACKWARDS — should select against)
+- winter does NOT select for large body (should) — body still shrinks
+4 of 7 traits (boldness, sociability, playfulness, aggression) are FLAT under
+every environment. Only energy/appetite/bodyScale respond, and only weakly.
+
+### B4. Body size is a one-way downward ratchet — **OPEN (design)**
+bodyScale drifts DOWN in every environment (−0.036 to −0.063), never up — even
+in winter, which is designed to favor large cold-resistant bodies. The
+small-cat advantage (r-strategy litters + longevity) overwhelms everything.
+You can never evolve big cats.
+
+### B5. playfulness has no selection pressure at all — **OPEN (design)**
+Grep confirms: playfulness is read for behavior (zoomies, pounce, play state)
+but never in any survival or reproduction path. It can only drift randomly —
+not be directed. Flat in all bench runs (|drift| ~0.012, the lowest).
+
+### B6. Drift plateaus by ~year 10 — **OPEN (design)**
+Trajectory analysis: |drift| peaks ~Y10 then flattens (boldness 0.015→0.039→
+0.031). Once the colony hits a few hundred cats, large-N resistance freezes the
+mean. Only bodyScale keeps creeping. Net visible drift stays < 0.06 (the
+"visibly evolving" target is ~0.05–0.15).
+
+### B7. 54% of colonies go extinct at founding — **OPEN (design)**
+The 2-founder bottleneck: median extinction year 7. Frustrating when trying to
+watch a colony evolve. Small colonies (low colonyScale) are even more fragile.
+
+**Bottom line:** to let the player witness directed evolution we need (a) small
+colonies — now possible via B1 fix; (b) environmental selection strong enough
+to overcome starvation (B2/B3); (c) body size able to go both ways (B4); (d) a
+selection pressure on playfulness (B5); (e) less founding extinction (B7).
+These are tuning/design changes — see chat for the proposed plan.
