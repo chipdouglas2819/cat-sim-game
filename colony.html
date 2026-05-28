@@ -1154,6 +1154,9 @@ import {
   recordParents as _recordParents,
   createCat as _createCat,
   dropFood as _dropFood,
+  mate as _mate,
+  giveBirth as _giveBirth,
+  triggerDeath as _triggerDeath,
 } from './src/sim/lifecycle.js';
 
 // ─── STATE ────────────────────────────────────────────────────
@@ -2273,182 +2276,13 @@ function moveToward(cat, tx, ty, speed) {
 }
 
 // ─── BREEDING ─────────────────────────────────────────────────
-function mate(a, b) {
-  const female = a.sex==='F' ? a : b;
-  const male = a.sex==='M' ? a : b;
-  if (female.pregnantWith) return;
-  female.pregnantWith = { fatherId: male.id, daysLeft: PREGNANCY_DAYS };
-  female.cooldownUntil = state.simTime + PREGNANCY_DAYS + BREED_COOLDOWN;
-  male.cooldownUntil = state.simTime + 6;
-  a.state='wander'; b.state='wander';
-  female.floatTexts.push({text:'♥', t:0, life:1.5});
-  male.floatTexts.push({text:'♥', t:0, life:1.5});
-  logEvent(`${female.name} and ${male.name} paired`, 'mate');
-}
-
-function giveBirth(mom) {
-  const father = catById.get(mom.pregnantWith.fatherId);
-  if (!father) { mom.pregnantWith = null; return; }
-  const F = inbreedingCoefficient(mom.id, father.id);
-
-  // ── LITTER SIZE: trait advantages are CONDITIONAL on environment ──
-  // No trait gives unconditional reproductive advantage. Selection direction depends on context.
-  let baseLitter = 3 + Math.floor(Math.random()*3);  // 3-5 base
-  // Maternal condition matters (well-fed moms have more), but NOT body size directly
-  const matFitness = clamp(mom.condition, 0.5, 1.2);
-  // Trait bonus is now SMALL and conditional
-  let traitBonus = 0;
-
-  // SIZE TRADE-OFF: small mothers produce MORE kittens (r-strategy: many cheap offspring),
-  // large mothers produce fewer but invest more per kitten (K-strategy: see survival advantages).
-  traitBonus += (1 - mom.bodyScale) * 0.8;   // 0.6× body → +0.3 kittens, 1.5× body → -0.4 kittens
-
-  // High boldness: better foraging in lean times, but extra predator risk loss
-  // Net: small positive in plentiful, neutral or negative under predator pressure
-  if (state.activeEvent === 'plentiful' || state.activeEvent === 'drought') {
-    traitBonus += (mom.genes.boldness - 0.5) * 0.4;
-  } else if (state.activeEvent === 'predator') {
-    traitBonus -= (mom.genes.boldness - 0.5) * 0.3;   // bold moms get caught
-  }
-  // High energy: critical in winter, costs in drought (high metabolism)
-  if (state.season === 'winter' || state.activeEvent === 'harshWinter') {
-    traitBonus += (mom.genes.energy - 0.5) * 0.7;
-  } else if (state.activeEvent === 'drought') {
-    traitBonus -= (mom.genes.energy - 0.5) * 0.3;
-  }
-  // High aggression: defends kittens from predators, but costs in peaceful times
-  if (state.activeEvent === 'predator') {
-    traitBonus += (mom.genes.aggression - 0.5) * 0.5;
-  } else if (state.activeEvent === 'plentiful' || (!state.activeEvent && state.season !== 'winter')) {
-    // In peace, aggression is mildly counter-productive (burns energy on nothing)
-    traitBonus -= (mom.genes.aggression - 0.5) * 0.15;
-  }
-  // High appetite: only beneficial when food is plentiful
-  if (state.activeEvent === 'plentiful') {
-    traitBonus += (mom.genes.appetite - 0.5) * 0.4;
-  } else if (state.activeEvent === 'drought' || state.season === 'winter') {
-    traitBonus -= (mom.genes.appetite - 0.5) * 0.5;   // high appetite suffers more in scarcity
-  }
-  // Sociability: helps in normal times (alloparenting), hurts in epidemics
-  if (state.activeEvent === 'epidemic') {
-    traitBonus -= (mom.genes.sociability - 0.5) * 0.4;
-  } else {
-    traitBonus += (mom.genes.sociability - 0.5) * 0.2;
-  }
-  // Father's body size only helps in defense scenarios
-  if (state.activeEvent === 'predator') {
-    traitBonus += (father.bodyScale - 1) * 0.3;
-  }
-
-  let litterSize = Math.max(0, Math.round(baseLitter * matFitness + traitBonus));
-  litterSize = Math.min(litterSize, 7);
-  // Postpartum mortality risk
-  const motherRisk = (litterSize - 2) * 0.02 + (1 - mom.condition) * 0.08 + F * 0.05;
-  const momWillDie = Math.random() < motherRisk;
-  if (litterSize <= 0) { mom.pregnantWith = null; return; }
-  const littermates = [];
-  for (let i=0; i<litterSize; i++) {
-    // Inbreeding may cause stillbirth. Also: extreme low-fitness moms have weaker kittens.
-    const stillbornChance = F * 0.5 + (1 - matFitness) * 0.05;
-    const sex = Math.random()<0.5 ? 'M' : 'F';
-    const kgenes = inheritGenes(mom, father, sex);
-    if (Math.random() < stillbornChance) {
-      state.stillborn++;
-      logEvent(`A kitten of ${mom.name} did not survive`, 'death');
-      continue;
-    }
-    const kitten = createCat({
-      sex, genes: kgenes,
-      name: pick(NAME_POOL),
-      parents: [mom.id, father.id],
-      x: mom.x + (Math.random()-0.5)*16,
-      y: mom.y + (Math.random()-0.5)*16,
-    });
-    parentsById.set(kitten.id, [mom.id, father.id]);
-    kitten.hunger = 0.85;
-    state.cats.push(kitten);
-    state.totalBorn++;
-    mom.children.push(kitten.id);
-    father.children.push(kitten.id);
-    // Track generation
-    const gen = Math.max(mom._gen || 1, father._gen || 1) + 1;
-    kitten._gen = gen;
-    if (gen > state.generation) state.generation = gen;
-    recordFirsts(kitten);
-    // Initial affinity: positive toward mom and dad
-    kitten.affinity.set(mom.id, 0.5);
-    kitten.affinity.set(father.id, 0.3);
-    // Mom recognizes her kitten
-    mom.affinity.set(kitten.id, 0.6);
-    father.affinity.set(kitten.id, 0.2);
-    littermates.push(kitten);
-  }
-  // Wire littermate mutual affinity — they grow up bonded
-  for (const a of littermates) {
-    for (const b of littermates) {
-      if (a !== b) a.affinity.set(b.id, 0.4);
-    }
-  }
-  logEvent(`${mom.name} bore ${litterSize} kitten${litterSize>1?'s':''}${F>0.15?' (inbred)':''}`, 'birth');
-  mom.pregnantWith = null;
-  if (momWillDie) {
-    // Mother dies in childbirth shortly after delivery
-    setTimeout(() => triggerDeath(mom, 'childbirth'), 0);
-  }
-}
-
+// mate / giveBirth / triggerDeath live in ./src/sim/lifecycle.js.
+// Wrappers pass sim + the eventSinks bag so logEvent goes through the web
+// layer's DOM-coupled version.
+function mate(a, b) { _mate(sim, a, b, eventSinks); }
+function giveBirth(mom) { _giveBirth(sim, mom, eventSinks); }
 // ─── DEATH ────────────────────────────────────────────────────
-function triggerDeath(cat, reason) {
-  if (cat.dying) return;
-  cat.dying = true;
-  cat.dyingT = 0;
-  cat.dyingReason = reason;
-  cat.vx = cat.vy = 0;
-  state.totalDied++;
-  if (cat.age > state.longestLife) {
-    state.longestLife = cat.age;
-    state.longestLifeName = cat.name;
-  }
-  // Snapshot for pedigree + end-screen. Keep a compact record.
-  const snapshot = {
-    id: cat.id,
-    name: cat.name,
-    sex: cat.sex,
-    age: cat.age,
-    bornAt: cat.bornAt,
-    diedAt: state.simTime,
-    diedOf: reason,
-    children: cat.children.length,
-    childrenIds: [...cat.children],
-    parents: cat.parents ? [...cat.parents] : null,
-    fightCount: cat.fightCount || 0,
-    inbreedF: cat.inbreedF || 0,
-    bodyScale: cat.bodyScale || 1,
-    phenotype: cat.phenotype,
-    genes: cat.genes,
-    gen: cat._gen || 1,
-    wasFounder: state.founders.includes(cat.id),
-  };
-  // Track all-time records incrementally (so we don't scan a huge array at end)
-  const r = state.records;
-  if (!r.oldest      || snapshot.age        > r.oldest.age)            r.oldest = snapshot;
-  if (!r.mostProlific|| snapshot.children   > r.mostProlific.children) r.mostProlific = snapshot;
-  if (!r.mostFights  || snapshot.fightCount > r.mostFights.fightCount) r.mostFights = snapshot;
-  if (!r.mostInbred  || snapshot.inbreedF   > r.mostInbred.inbreedF)   r.mostInbred = snapshot;
-  if (!r.biggest     || snapshot.bodyScale  > r.biggest.bodyScale)     r.biggest = snapshot;
-  // Push to deceased but cap the array — only recent dead are kept for pedigree lookups.
-  state.deceased.push(snapshot);
-  if (state.deceased.length > 400) state.deceased.shift();
-  logEvent(`${cat.name} died (${reason}, week ${cat.age.toFixed(0)})`, 'death');
-  // Maternal grief: if a kitten dies, mom withdraws socially for a while
-  if (cat.stage === 'kitten' && cat.parents) {
-    const mom = (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
-    if (mom) {
-      mom.social = Math.min(mom.social, 0.15);   // social drive blunted
-      if (state.cats.length < 500) mom.floatTexts.push({text: '…', t: 0, life: 2});
-    }
-  }
-}
+function triggerDeath(cat, reason) { _triggerDeath(sim, cat, reason, eventSinks); }
 
 function drawDying(ctx, cat) {
   const t = cat.dyingT;
