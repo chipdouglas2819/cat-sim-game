@@ -1745,7 +1745,9 @@ function openInspector(cat) {
   const gen = cat._gen || 1;
   const sizePct = Math.round((cat.bodyScale || 1) * 100);
   const sizeWord = cat.bodyScale < 0.7 ? 'small' : cat.bodyScale > 1.3 ? 'large' : 'average';
-  sub.textContent = `${cat.sex==='M'?'♂':'♀'} · G${gen} · ${cat.stage} · ${cat.age.toFixed(0)}w · ${sizeWord} (${sizePct}%) · ${cat.phenotype.description}${sublineExtra}`;
+  // "build" = realized body size (phenotype, ~45-160%). Distinct from the
+  // heritable "Size gene" bar in Disposition below (genotype, 0-100%).
+  sub.textContent = `${cat.sex==='M'?'♂':'♀'} · G${gen} · ${cat.stage} · ${cat.age.toFixed(0)}w · ${sizeWord} build ${sizePct}% · ${cat.phenotype.description}${sublineExtra}`;
   meta.appendChild(sub);
   // Special trait badges
   if (cat.rareTraits && cat.rareTraits.length) {
@@ -1804,7 +1806,9 @@ function openInspector(cat) {
   bg.appendChild(needBar('Aggro', cat.genes.aggression, true));
   bg.appendChild(needBar('Energy', cat.genes.energy, true));
   bg.appendChild(needBar('Appetite', cat.genes.appetite, true));
-  if (cat.genes.size !== undefined) bg.appendChild(needBar('Size', cat.genes.size, true));
+  // The heritable size gene (genotype) — what offspring inherit. Differs from
+  // the realized "build %" in the header, which adds appetite/energy/noise.
+  if (cat.genes.size !== undefined) bg.appendChild(needBar('Size gene', cat.genes.size, true));
   panel.appendChild(bg);
 
   // Coat tint — explains what trait color (if any) shifts this cat's coat in the arena

@@ -74,13 +74,18 @@ export class Simulation {
     this.notableEvents = [];
     this.deceased = [];                    // snapshots of every cat who died (capped — see triggerDeath)
     this.deathCauses = {};                 // running histogram: reason → count
+    this.eventExposure = {};               // sim-weeks each event type was active (for bench correlation)
     this.founders = [];                    // ids of the starting pair
     this.founderGenes = null;              // captured at start for drift comparison
     this.lastDriftAnnouncement = {};       // last-narrated drift per trait
     this.firsts = {};                      // {phenotypeKey: catName}
     this.activeEvent = null;
     this.activeEventMessage = '';
-    this.climate = makeStartingWeather();  // weather-bias multipliers; drifts yearly
+    // Weather-bias multipliers; drift yearly. config.climate lets the bench force
+    // an environment (e.g. {predator: 3, drought: 0.2, ...}) to test conditional
+    // selection. config.driftWeather=false freezes it so a forced bias persists.
+    this.climate = config.climate ? { ...makeStartingWeather(), ...config.climate } : makeStartingWeather();
+    this.driftWeatherEnabled = config.driftWeather !== false;
     this.eventLog = [];                    // history of events for end screen
     this.eventTimeline = [];               // {simTime, event, season, message} for chart markers
 
@@ -202,8 +207,13 @@ export class Simulation {
     if (newYear !== this.year) {
       this.year = newYear;
       this.logEvent(`Year ${newYear} begins.`, 'event');
-      driftWeather(this);
+      if (this.driftWeatherEnabled) driftWeather(this);
       this._narrateDrift();
+    }
+
+    // Tally how long each event type is active (for bench environment correlation)
+    if (this.activeEvent) {
+      this.eventExposure[this.activeEvent] = (this.eventExposure[this.activeEvent] || 0) + dt;
     }
 
     // ─── Food spawning ───────────────────────────────────────
@@ -378,6 +388,7 @@ export class Simulation {
       activeEvent: this.activeEvent,
       climate: this.climate ? { ...this.climate } : null,
       deathCauses: { ...this.deathCauses },
+      eventExposure: { ...this.eventExposure },
       founderGenes: this.founderGenes ? { ...this.founderGenes } : null,
     };
   }
