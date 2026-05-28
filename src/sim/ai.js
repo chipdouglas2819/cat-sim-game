@@ -108,7 +108,7 @@ export function chooseAction(sim, cat) {
     // events become the differentiator (audit B3/B4 — traits were one-way
     // because constant food competition washed events out).
     const foodPerCat = sim.food.length / Math.max(1, sim.cats.length);
-    const scarcity = clamp((0.6 - foodPerCat) / 0.6, 0, 1);  // 0 = plentiful, 1 = none
+    const scarcity = clamp((0.4 - foodPerCat) / 0.4, 0, 1);  // 0 = plentiful, 1 = none
     const willingThreshold = 0.35 - cat.genes.sociability * 0.2 - cat.genes.playfulness * 0.1 + scarcity * 0.9;
     if (rand() > willingThreshold) {
       const partner = findNearest(sim, cat, c =>
@@ -226,12 +226,14 @@ export function updateCat(sim, cat, dt, sinks) {
 
   // Needs decay (per sim-week)
   // Hunger drain scales with body size — bigger cats burn more.
-  // Base lowered 0.030→0.022 so cats starve less readily (audit B2). Big cats
-  // still pay more, but the exponent is softened 1.5→1.15: at 1.5 the constant
-  // food penalty on large bodies overwhelmed every episodic winter/predator
-  // benefit, so size could only ever shrink (audit B4). Softer cost lets harsh
-  // environments push size UP while drought still pushes it down.
-  let hungerDrain = (0.022 + cat.genes.appetite * 0.028) * Math.pow(cat.bodyScale, 1.15);
+  // Base lowered 0.030→0.022 so cats starve less readily (audit B2). The
+  // appetite term is softened (0.028→0.012) and body exponent 1.5→1.15: those
+  // constant per-tick food penalties used to overwhelm every episodic
+  // environment benefit, so appetite/body could ONLY shrink (audit B4). With a
+  // light constant cost, the conditional trade-offs (appetite good in plenty /
+  // bad in drought; body good in winter / bad in drought) drive direction, so
+  // both can now evolve up OR down by environment.
+  let hungerDrain = (0.024 + cat.genes.appetite * 0.026) * Math.pow(cat.bodyScale, 1.15);
   if (cat.stage === 'kitten') hungerDrain *= 0.35;
   if (cat.pregnantWith) hungerDrain *= 1.3;
   cat.hunger = clamp(cat.hunger - hungerDrain * dt, 0, 1);

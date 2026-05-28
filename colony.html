@@ -2656,7 +2656,11 @@ function beginSim() {
   state.deceased = [];
   state.deathCauses = {};
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
-  state.colonyScale = 1;
+  // Lower carrying capacity (was 1) → smaller colonies (~40-80 cats depending on
+  // screen) where genetic drift is actually visible. At 1 the colony grew to
+  // hundreds and evolution froze (large-N resistance). This is the key dial for
+  // "witness evolution" vs "stable colony" — see COLONY_AUDIT bench findings.
+  state.colonyScale = 0.4;
 
   // resize canvas (sets sim.arenaW/H before founders are placed)
   canvas = document.getElementById('arena');
