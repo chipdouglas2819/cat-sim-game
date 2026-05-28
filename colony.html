@@ -1,0 +1,4496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#e8dec3">
+<title>Colony</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ede2c6;
+  --bg-deep: #ddd0ac;
+  --paper: #f7efd8;
+  --paper-soft: #f3e9cc;
+  --ink: #2b3328;
+  --ink-soft: #5e5a48;
+  --ink-faint: #8a8068;
+  --moss: #5b7048;
+  --moss-deep: #3e5232;
+  --terracotta: #b3603e;
+  --gold: #b88a3c;
+  --rose: #c47a6e;
+  --border: #c9b88c;
+  --border-soft: #d9c9a0;
+  --shadow: rgba(70, 50, 20, 0.18);
+  --shadow-soft: rgba(70, 50, 20, 0.08);
+  --female: #b85d6a;
+  --male: #4a6b8a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Albert Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overscroll-behavior: none;
+}
+body { position: relative; }
+
+button { font-family: inherit; color: inherit; cursor: pointer; border: none; background: none; }
+
+/* === PAPER TEXTURE === */
+.paper-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(200,170,110,0.12) 0%, transparent 50%),
+    radial-gradient(circle at 80% 85%, rgba(180,140,90,0.10) 0%, transparent 50%),
+    var(--bg);
+}
+.paper-bg::before {
+  content: ''; position: absolute; inset: 0; opacity: 0.4;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(120,90,40,0.015) 3px 4px),
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(120,90,40,0.01) 5px 6px);
+  pointer-events: none;
+}
+
+/* === SETUP SCREEN === */
+#setup {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+}
+#setup .container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 20px calc(env(safe-area-inset-bottom, 0) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.setup-header { text-align: center; }
+.setup-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 42px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.setup-subtitle {
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.setup-blurb {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-soft);
+  text-align: center;
+  max-width: 320px;
+  margin: 0 auto;
+  line-height: 1.45;
+}
+
+.cat-pair { display: flex; flex-direction: column; gap: 14px; }
+
+.cat-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  position: relative;
+  box-shadow: 0 1px 0 var(--border-soft), 0 8px 16px var(--shadow-soft);
+}
+.cat-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.cat-card-title {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-style: italic;
+  display: flex; align-items: center; gap: 8px;
+}
+.sex-pill {
+  font-family: 'Albert Sans', sans-serif;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 100px;
+  text-transform: uppercase;
+}
+.sex-pill.male { background: rgba(74,107,138,0.15); color: var(--male); }
+.sex-pill.female { background: rgba(184,93,106,0.15); color: var(--female); }
+
+.cat-preview {
+  height: 130px;
+  background: var(--paper-soft);
+  border: 1px dashed var(--border-soft);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.cat-preview canvas { display: block; }
+
+.cat-name-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.cat-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 19px;
+  font-style: italic;
+  color: var(--ink);
+  padding: 4px 2px;
+  outline: none;
+}
+.cat-name-input:focus { border-bottom-color: var(--moss); }
+
+.tag-row {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 12px;
+  min-height: 22px;
+}
+.tag {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  background: var(--paper-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 100px;
+  color: var(--ink-soft);
+}
+
+.cat-actions { display: flex; gap: 8px; }
+.btn-pill {
+  flex: 1;
+  padding: 9px 12px;
+  background: var(--paper-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: all 0.15s;
+}
+.btn-pill:active { background: var(--bg-deep); transform: scale(0.98); }
+.btn-pill.primary {
+  background: var(--moss-deep);
+  border-color: var(--moss-deep);
+  color: var(--paper);
+}
+.btn-pill.primary:active { background: var(--moss); }
+
+.expander {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 12px;
+}
+.expander-toggle {
+  width: 100%; text-align: left;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0;
+}
+.expander-toggle::after { content: '+'; font-size: 18px; font-weight: 300; }
+.expander.open .expander-toggle::after { content: '−'; }
+.expander-body { display: none; margin-top: 10px; }
+.expander.open .expander-body { display: block; }
+
+.slider-row { margin-bottom: 10px; }
+.slider-label {
+  display: flex; justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+.slider-label .val { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.slider-row input[type=range] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--border-soft);
+  border-radius: 2px;
+  outline: none;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--moss-deep);
+  cursor: pointer;
+  border: 2px solid var(--paper);
+  box-shadow: 0 1px 2px var(--shadow);
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--moss-deep);
+  border: 2px solid var(--paper);
+}
+
+.begin-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+  margin-top: 4px;
+}
+.begin-btn:active { transform: scale(0.98); background: var(--moss-deep); }
+
+.roll-both-btn {
+  align-self: center;
+  padding: 8px 18px;
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  background: var(--paper);
+}
+
+/* === GAME === */
+#game { position: fixed; inset: 0; display: none; }
+#game.active { display: block; }
+#arena {
+  position: absolute; inset: 0;
+  display: block;
+  touch-action: none;
+}
+
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: calc(env(safe-area-inset-top, 0) + 10px) 14px 10px;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(237,226,198,0.95) 0%, rgba(237,226,198,0.7) 70%, transparent 100%);
+  z-index: 5;
+  pointer-events: none;
+}
+#topbar > * { pointer-events: auto; }
+
+.stat-block {
+  display: flex; flex-direction: column;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 1.1;
+}
+.stat-block.stat-right { align-items: flex-end; }
+.stat-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: block;
+}
+.stat-block .val {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0 1px;
+  display: block;
+}
+.stat-sub {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0;
+  color: var(--moss-deep);
+  display: block;
+}
+.stat-sub.spring { color: var(--moss); }
+.stat-sub.summer { color: var(--gold); }
+.stat-sub.fall   { color: var(--terracotta); }
+.stat-sub.winter { color: var(--male); }
+.gen-tag {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--moss-deep);
+  margin-left: 4px;
+}
+
+#endRunBtn {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px var(--shadow-soft);
+}
+#endRunBtn:active { background: var(--bg-deep); }
+
+.topbar-right {
+  display: flex; align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.season-tag {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0;
+  color: var(--terracotta);
+  margin-left: 4px;
+}
+.season-tag.summer { color: var(--gold); }
+.season-tag.spring { color: var(--moss); }
+.season-tag.fall   { color: var(--terracotta); }
+.season-tag.winter { color: var(--male); }
+
+#eventBanner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0) + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--paper);
+  padding: 7px 16px;
+  border-radius: 100px;
+  box-shadow: 0 4px 12px var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: bannerIn 0.4s ease-out;
+}
+#eventBanner.harshWinter { background: #4a6b8a; }
+#eventBanner.predator    { background: #8b4040; }
+#eventBanner.drought     { background: #b88a3c; }
+#eventBanner.epidemic    { background: #6b7c4a; }
+#eventBanner.plentiful   { background: #5b7048; }
+#eventBanner.hidden      { display: none; }
+@keyframes bannerIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+#evoToggle {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0) + 110px);
+  right: 12px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  color: var(--moss-deep);
+  font-size: 14px;
+  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px var(--shadow-soft);
+  z-index: 5;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+}
+#evoToggle:active { background: var(--bg-deep); }
+#evoTracker {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0) + 144px);
+  right: 12px;
+  width: 188px;
+  background: rgba(247,239,216,0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  z-index: 5;
+  box-shadow: 0 4px 12px var(--shadow-soft);
+}
+#evoTracker.hidden { display: none; }
+.evo-title {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.evo-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 28px;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 3px;
+  gap: 6px;
+}
+.evo-row .evo-label {
+  color: var(--ink-soft);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+}
+.evo-row .evo-bar-wrap {
+  position: relative;
+  height: 5px;
+  background: var(--bg-deep);
+  border-radius: 3px;
+}
+.evo-row .evo-zero {
+  position: absolute;
+  left: 50%; top: -1px;
+  width: 1px; height: 7px;
+  background: var(--ink-faint);
+  opacity: 0.6;
+}
+.evo-row .evo-fill {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: var(--moss-deep);
+  border-radius: 3px;
+}
+.evo-row .evo-fill.neg { background: var(--terracotta); }
+.evo-row .evo-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+  font-size: 10px;
+  text-align: right;
+}
+
+#confirmModal {
+  position: fixed; inset: 0; z-index: 25;
+  background: rgba(40,30,15,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.confirm-panel {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px 22px 18px;
+  max-width: 360px; width: 100%;
+  box-shadow: 0 12px 36px var(--shadow);
+}
+.confirm-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.confirm-body {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex; gap: 8px;
+}
+.confirm-actions .btn-pill { flex: 1; }
+
+.speed-controls {
+  display: flex; gap: 2px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 3px;
+}
+.speed-btn {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 100px;
+  color: var(--ink-faint);
+  min-width: 28px;
+  transition: all 0.1s;
+}
+.speed-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+#log {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0) + 10px);
+  left: 14px;
+  right: 14px;
+  max-height: 30vh;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+  display: flex; flex-direction: column-reverse;
+  gap: 4px;
+}
+.log-entry {
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: rgba(247,239,216,0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border-left: 2px solid var(--moss);
+  max-width: 320px;
+  animation: logIn 0.3s ease-out;
+  font-style: italic;
+  font-family: 'Fraunces', serif;
+}
+.log-entry.event-birth { border-left-color: var(--gold); }
+.log-entry.event-death { border-left-color: var(--rose); }
+.log-entry.event-mate { border-left-color: var(--terracotta); }
+@keyframes logIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === INSPECTOR === */
+#inspector {
+  position: fixed; inset: 0; z-index: 20;
+  pointer-events: none;
+  display: flex; flex-direction: column;
+  justify-content: flex-end;
+}
+#inspector.open { pointer-events: auto; }
+#inspector::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(40,30,15,0.3);
+  opacity: 0; transition: opacity 0.2s;
+}
+#inspector.open::before { opacity: 1; }
+.inspector-panel {
+  position: relative;
+  background: var(--paper);
+  border-top-left-radius: 24px; border-top-right-radius: 24px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 22px 20px calc(env(safe-area-inset-bottom, 0) + 30px);
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 -8px 30px var(--shadow);
+}
+#inspector.open .inspector-panel { transform: translateY(0); }
+.panel-handle {
+  width: 40px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 18px;
+}
+.inspector-head {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 18px;
+}
+.inspector-portrait {
+  width: 80px; height: 80px;
+  background: var(--paper-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.inspector-portrait canvas { display: block; }
+.inspector-meta { flex: 1; }
+.inspector-name {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  padding: 2px 0;
+  width: 100%;
+}
+.inspector-name:focus { border-bottom-color: var(--border); }
+.inspector-subline {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+
+.section-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 18px 0 8px;
+  font-weight: 600;
+}
+
+.aura-info {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px;
+  background: var(--paper-soft);
+  border-radius: 8px;
+}
+.aura-swatch {
+  flex: 0 0 36px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(0,0,0,0.08) inset;
+  margin-top: 2px;
+}
+.aura-text { flex: 1; }
+.aura-label {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+.aura-desc {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.needs-bars { display: flex; flex-direction: column; gap: 8px; }
+.need-bar {
+  display: grid; grid-template-columns: 70px 1fr 32px;
+  align-items: center; gap: 10px;
+  font-size: 12px;
+}
+.need-bar .label { color: var(--ink-soft); }
+.need-bar .track {
+  height: 6px;
+  background: var(--bg-deep);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.need-bar .fill {
+  height: 100%;
+  background: var(--moss);
+  transition: width 0.2s;
+}
+.need-bar .fill.warn { background: var(--gold); }
+.need-bar .fill.danger { background: var(--terracotta); }
+.need-bar .val { font-variant-numeric: tabular-nums; color: var(--ink-faint); font-size: 11px; }
+
+.gene-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  font-size: 12px;
+}
+.gene-row {
+  display: flex; justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--border-soft);
+}
+.gene-row .gene-name { color: var(--ink-soft); }
+.gene-row .gene-val {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.relate-list { display: flex; flex-direction: column; gap: 4px; }
+.relate-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px dotted var(--border-soft);
+}
+.relate-item .label { color: var(--ink-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.relate-item .vals { font-family: 'Fraunces', serif; font-style: italic; }
+
+.coefficient-display {
+  background: var(--paper-soft);
+  border-left: 3px solid var(--terracotta);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 6px 0;
+}
+.coefficient-display strong { color: var(--terracotta); font-weight: 600; }
+
+.rare-badges {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.rare-badge {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  background: rgba(184,138,60,0.18);
+  color: var(--gold);
+  border-radius: 100px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.pedigree {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.pedigree-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pedigree-kids { justify-content: flex-start; }
+.pedigree-note {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 8px 0;
+}
+.pedigree-divider {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+  margin: 6px 0 2px;
+}
+.pedigree-card {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--paper-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 6px 6px;
+  min-width: 64px;
+  max-width: 80px;
+  text-align: center;
+}
+.pedigree-card.tappable { cursor: pointer; transition: background 0.12s; }
+.pedigree-card.tappable:active { background: var(--bg-deep); }
+.pedigree-card.deceased { opacity: 0.6; }
+.pedigree-card.missing .ped-portrait { background: var(--bg-deep); }
+.ped-portrait {
+  width: 48px; height: 48px;
+  background: var(--paper);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ped-name {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.1;
+  word-break: break-word;
+}
+.ped-role {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 1px;
+}
+
+/* === END SCREEN === */
+#end {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  display: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+}
+#end.active { display: block; }
+.end-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 20px calc(env(safe-area-inset-bottom, 0) + 24px);
+}
+.end-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 34px;
+  line-height: 1.05;
+  margin-bottom: 4px;
+}
+.end-subtitle {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+.end-cause {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--ink-soft);
+  margin-bottom: 28px;
+  line-height: 1.4;
+  border-left: 2px solid var(--moss);
+  padding-left: 10px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.stat-cell {
+  background: var(--paper);
+  padding: 14px 14px;
+}
+.stat-cell .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
+.stat-cell .val {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 26px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stat-cell .sub {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.chart-wrap {
+  background: var(--paper);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.chart-title {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+.chart-hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  font-family: 'Fraunces', serif;
+  margin-top: 6px;
+  text-align: center;
+}
+.chart-wrap canvas { display: block; width: 100%; height: 120px; cursor: pointer; }
+
+#chartTooltip {
+  position: fixed;
+  display: none;
+  z-index: 50;
+  width: 220px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(40,30,15,0.35);
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+#chartTooltip .ct-title {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+#chartTooltip .ct-when {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+#chartTooltip .ct-msg {
+  font-size: 11px;
+  font-style: italic;
+  font-family: 'Fraunces', serif;
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+.notable-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.notable {
+  background: var(--paper);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px;
+}
+.notable .who { font-family: 'Fraunces', serif; font-style: italic; }
+.notable .what { font-size: 11px; color: var(--ink-faint); }
+
+.restart-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ====== SETUP SCREEN ====== -->
+<div id="setup">
+  <div class="container">
+    <div class="setup-header">
+      <div class="setup-title">Colony</div>
+      <div class="setup-subtitle">A study in cats</div>
+    </div>
+    <div class="setup-blurb">
+      Two cats begin. The pair you assemble is the pair you watch. Every cat to come will descend from them.
+    </div>
+
+    <button class="roll-both-btn" id="rollBoth">Roll Both</button>
+
+    <div class="cat-pair">
+      <div class="cat-card" data-cat="A">
+        <div class="cat-card-head">
+          <div class="cat-card-title">First<span class="sex-pill male">Male</span></div>
+        </div>
+        <div class="cat-preview"><canvas data-preview="A" width="180" height="120"></canvas></div>
+        <div class="cat-name-row">
+          <input class="cat-name-input" data-name="A" type="text" maxlength="14">
+        </div>
+        <div class="tag-row" data-tags="A"></div>
+        <div class="cat-actions">
+          <button class="btn-pill" data-reroll="A">Re-roll</button>
+          <button class="btn-pill" data-reroll-look="A">Look only</button>
+        </div>
+        <div class="expander" data-expander="A">
+          <button class="expander-toggle">Personality</button>
+          <div class="expander-body" data-sliders="A"></div>
+        </div>
+      </div>
+
+      <div class="cat-card" data-cat="B">
+        <div class="cat-card-head">
+          <div class="cat-card-title">Second<span class="sex-pill female">Female</span></div>
+        </div>
+        <div class="cat-preview"><canvas data-preview="B" width="180" height="120"></canvas></div>
+        <div class="cat-name-row">
+          <input class="cat-name-input" data-name="B" type="text" maxlength="14">
+        </div>
+        <div class="tag-row" data-tags="B"></div>
+        <div class="cat-actions">
+          <button class="btn-pill" data-reroll="B">Re-roll</button>
+          <button class="btn-pill" data-reroll-look="B">Look only</button>
+        </div>
+        <div class="expander" data-expander="B">
+          <button class="expander-toggle">Personality</button>
+          <div class="expander-body" data-sliders="B"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="begin-btn" id="beginBtn">Begin</button>
+  </div>
+</div>
+
+<!-- ====== GAME ====== -->
+<div id="game">
+  <canvas id="arena"></canvas>
+  <div id="topbar">
+    <div class="stat-block">
+      <span class="stat-label">Week</span>
+      <span class="val" id="dayCount">0</span>
+      <span class="stat-sub" id="weekSub">spring · Y1</span>
+    </div>
+    <div class="speed-controls" id="speedControls">
+      <button class="speed-btn" data-speed="0">II</button>
+      <button class="speed-btn active" data-speed="1">1×</button>
+      <button class="speed-btn" data-speed="2">2×</button>
+      <button class="speed-btn" data-speed="4">4×</button>
+      <button class="speed-btn" data-speed="8">8×</button>
+    </div>
+    <div class="topbar-right">
+      <div class="stat-block stat-right">
+        <span class="stat-label">Cats</span>
+        <span class="val" id="popCount">0</span>
+        <span class="stat-sub" id="catSub">Gen 1</span>
+      </div>
+      <button id="endRunBtn" title="End run">×</button>
+    </div>
+  </div>
+  <div id="eventBanner" class="hidden"></div>
+  <button id="evoToggle" title="Evolution tracker">↗</button>
+  <div id="evoTracker" class="hidden">
+    <div class="evo-title">Drift from founders</div>
+    <div class="evo-rows" id="evoRows"></div>
+  </div>
+  <div id="log"></div>
+  <div id="inspector">
+    <div class="inspector-panel" id="inspectorPanel"></div>
+  </div>
+  <div id="confirmModal" class="hidden">
+    <div class="confirm-panel">
+      <div class="confirm-title">End this run?</div>
+      <div class="confirm-body">The colony will be sealed and you'll see the final tally. This can't be undone.</div>
+      <div class="confirm-actions">
+        <button class="btn-pill" id="confirmCancel">Keep watching</button>
+        <button class="btn-pill primary" id="confirmEnd">End run</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== END SCREEN ====== -->
+<div id="end">
+  <div class="end-container" id="endContent"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//   COLONY — cat genetics & behavior simulator
+// ════════════════════════════════════════════════════════════════
+
+// ─── CONSTANTS ────────────────────────────────────────────────
+const SIM_DAY_REAL_SEC = 4;          // 1 sim-day = 4 real seconds at 1x
+const KITTEN_DAYS = 15;
+const JUVENILE_DAYS = 30;
+const ADULT_END = 300;
+const SENIOR_END = 400;               // base lifespan
+const PREGNANCY_DAYS = 9;             // pregnancy in sim-weeks (~real cat ~9 weeks)
+const BREED_COOLDOWN = 6;             // post-birth cooldown (lets females have 2 litters/season)
+const FOOD_LIFETIME = 80;             // sim-days a food morsel persists (longer — less waste)
+const FEED_SPOTS_COUNT = 3;           // permanent gathering points in the arena
+const FOOD_SPAWN_INTERVAL = 0.4;      // sim-days between spawn checks
+const FOOD_PER_CAT = 0.55;            // morsels per cat we aim to keep on the ground
+const FOOD_TARGET_MIN = 4;            // minimum target regardless of pop
+const FOOD_BURST_MAX = 4;             // morsels per spawn check when catching up
+const FOOD_RANDOM_CHANCE = 0.35;      // chance a morsel spawns at random location instead of feeding spot
+const FOOD_SPOT_JITTER = 80;          // morsel scatter radius around a spot (was 32)
+// Soft carrying capacity — populations self-regulate via stress instead of a hard cap.
+// Hard ceiling kept as a safety valve only (never hit in normal runs).
+const POP_SOFT_TARGET_BASE = 25;     // baseline comfortable population
+const POP_HARD_CEILING = 80;         // never exceed (safety against runaway)
+const ESTRUS_CYCLE_WEEKS = 8;        // estrus cycle (real cats: 2-3 weeks between heats)
+const ESTRUS_DURATION = 4;           // weeks per cycle receptive (so cats are in heat ~half the time during breeding season)
+const MUTATION_RATE = 0.02;
+const NAME_POOL = [
+  'Whiskers','Mittens','Tabitha','Pippa','Marlow','Juno','Sable','Wren',
+  'Cinder','Olive','Mochi','Bramble','Pebble','Pumpkin','Slate','Linden',
+  'Clover','Soot','Apricot','Hazel','Felix','Dorian','Magnolia','Birch',
+  'Cricket','Pip','Atlas','Bean','Fig','Saffron','Cosmo','Nettle','Reed',
+  'Thistle','Daphne','Iris','Otis','Pearl','Quince','Rye','Sorrel','Tansy',
+  'Acorn','Almond','Amber','Arrow','Ash','Aspen','Aster','Autumn','Basil',
+  'Bay','Beech','Biscuit','Blossom','Boots','Briar','Brindle','Brook',
+  'Buttons','Caramel','Cedar','Chestnut','Chip','Cocoa','Coffee','Crumpet',
+  'Daisy','Dandelion','Dottie','Drift','Echo','Ember','Fennel','Fern',
+  'Finch','Flax','Fleck','Flora','Frost','Ginger','Goose','Hawthorn',
+  'Honey','Indigo','Ivy','Jasper','Juniper','Kettle','Lark','Laurel',
+  'Lavender','Lichen','Lily','Loam','Loon','Lupin','Maple','Marigold',
+  'Marrow','Marsh','Meadow','Milkweed','Minnow','Mist','Moss','Muffin',
+  'Mulberry','Nimbus','Nutmeg','Oak','Onyx','Opal','Orchard','Otter',
+  'Patches','Peach','Penny','Pickle','Pine','Pinto','Plover','Plum',
+  'Poppy','Posy','Primrose','Quill','Rain','Raven','Rose','Rowan',
+  'Rust','Sage','Scout','Seed','Shadow','Shale','Smoke','Smudge',
+  'Sparrow','Stitch','Sweetpea','Sycamore','Tarragon','Teal','Thatch',
+  'Tilly','Toffee','Truffle','Vesper','Violet','Walnut','Whimsy',
+  'Willow','Winter','Wisp','Wisteria','Yarrow','Yew','Zephyr','Mango',
+  'Mable','Lulu','Cleo','Suki','Tofu','Yuki','Suki','Pip','Bingo',
+  'Beanie','Tucker','Milo','Theo','Oscar','Rusty','Charlie','Bruno'
+];
+
+// Visible gene alleles (ordered for dominance where applicable)
+const ALLELE_POOLS = {
+  B: ['B','b'],                       // black > brown
+  D: ['D','d'],                       // dense > dilute
+  A: ['A','a'],                       // agouti > solid
+  T: ['Mc','Cs','Sp','Tk'],           // tabby pattern (random pick, codom in inheritance)
+  S: ['S','s'],                       // white spotting (codominant)
+  L: ['L','l'],                       // short > long
+  W: ['W','w']                        // white > non-white (W rare)
+};
+
+// ─── STATE ────────────────────────────────────────────────────
+const state = {
+  phase: 'setup',                     // setup | running | ended
+  cats: [],
+  food: [],
+  feedSpots: [],                      // fixed anchor points around which food spawns
+  nextId: 1,
+  simTime: 0,                         // sim-days elapsed
+  speed: 1,
+  lastTime: 0,
+  lastAutoFood: 0,
+  generation: 1,
+  totalBorn: 2,
+  totalDied: 0,
+  stillborn: 0,
+  events: [],                         // {simTime, text, type}
+  history: [],                        // population samples for chart
+  diversityHistory: [],               // genetic diversity samples
+  geneHistory: {                      // gene-mean over time (behavioral genes)
+    boldness: [], sociability: [], playfulness: [],
+    aggression: [], energy: [], appetite: [],
+    bodyScale: []
+  },
+  selectedCatId: null,
+  starter: { A: null, B: null },      // staged starter cat configs
+  longestLife: 0,
+  longestLifeName: '',
+  oldestEver: null,
+  notableEvents: [],
+  deceased: [],                       // snapshots of every cat who died for end-of-run hall
+  founders: [],                       // ids of the starting pair
+  firsts: {},                         // {phenotypeKey: catName} — tracks first appearances
+  endCause: '',                       // reason the run ended
+  endedByUser: false,                 // true if user pressed End Run
+  season: 'spring',                   // current season (auto-derived from simTime)
+  year: 1,                            // year count (1-indexed)
+  diseaseOutbreaks: 0,                // track for end screen
+  activeEvent: null,                  // current environmental event
+  activeEventMessage: '',
+  eventLog: [],                       // history of events for end screen
+  eventTimeline: [],                  // {simTime, event, season, message} for chart markers
+  records: {                          // all-time record holders (tracked incrementally to avoid scanning huge deceased array)
+    oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null,
+  },
+  colonyScale: 1,                     // carrying-capacity multiplier (player setting): smaller = faster evolution
+};
+
+// ─── UTILS ────────────────────────────────────────────────────
+const rand = (a=1, b) => b === undefined ? Math.random()*a : a + Math.random()*(b-a);
+const randInt = (a, b) => Math.floor(rand(a, b+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const dist = (a, b) => { const dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); };
+const gauss = () => { // Box-Muller
+  let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+};
+const id = () => state.nextId++;
+
+// ─── GENES ────────────────────────────────────────────────────
+function rollGenes(sex) {
+  // Visible — sample alleles with frequency biases for variety
+  const g = {
+    B: [Math.random()<0.7?'B':'b', Math.random()<0.7?'B':'b'],
+    D: [Math.random()<0.7?'D':'d', Math.random()<0.7?'D':'d'],
+    A: [Math.random()<0.65?'A':'a', Math.random()<0.65?'A':'a'],
+    T: [pick(ALLELE_POOLS.T), pick(ALLELE_POOLS.T)],
+    S: [Math.random()<0.4?'S':'s', Math.random()<0.4?'S':'s'],
+    L: [Math.random()<0.78?'L':'l', Math.random()<0.78?'L':'l'],
+    W: [Math.random()<0.05?'W':'w', Math.random()<0.05?'W':'w'],
+    O: sex==='M' ? [Math.random()<0.3?'O':'o'] : [Math.random()<0.3?'O':'o', Math.random()<0.3?'O':'o'],
+    // Wider variance on founders — extreme starting pairs lead to different colonies (founder effect)
+    boldness: clamp(0.5 + gauss()*0.30, 0.05, 0.95),
+    sociability: clamp(0.5 + gauss()*0.28, 0.05, 0.95),
+    playfulness: clamp(0.5 + gauss()*0.28, 0.05, 0.95),
+    aggression: clamp(0.4 + gauss()*0.25, 0.02, 0.95),
+    energy: clamp(0.55 + gauss()*0.25, 0.10, 0.95),
+    appetite: clamp(0.5 + gauss()*0.25, 0.15, 0.95),
+    size: clamp(0.5 + gauss()*0.22, 0.05, 0.95),   // heritable body size gene
+  };
+  return g;
+}
+
+function inheritGenes(mom, dad, kittenSex) {
+  const mg = mom.genes, dg = dad.genes;
+  const pickAllele = (alleles) => alleles[Math.floor(Math.random()*alleles.length)];
+  const maybeMutate = (allele, pool) => {
+    if (Math.random() < MUTATION_RATE) return pick(pool);
+    return allele;
+  };
+  const g = {
+    B: [maybeMutate(pickAllele(mg.B), ALLELE_POOLS.B), maybeMutate(pickAllele(dg.B), ALLELE_POOLS.B)],
+    D: [maybeMutate(pickAllele(mg.D), ALLELE_POOLS.D), maybeMutate(pickAllele(dg.D), ALLELE_POOLS.D)],
+    A: [maybeMutate(pickAllele(mg.A), ALLELE_POOLS.A), maybeMutate(pickAllele(dg.A), ALLELE_POOLS.A)],
+    T: [maybeMutate(pickAllele(mg.T), ALLELE_POOLS.T), maybeMutate(pickAllele(dg.T), ALLELE_POOLS.T)],
+    S: [maybeMutate(pickAllele(mg.S), ALLELE_POOLS.S), maybeMutate(pickAllele(dg.S), ALLELE_POOLS.S)],
+    L: [maybeMutate(pickAllele(mg.L), ALLELE_POOLS.L), maybeMutate(pickAllele(dg.L), ALLELE_POOLS.L)],
+    W: [maybeMutate(pickAllele(mg.W), ALLELE_POOLS.W), maybeMutate(pickAllele(dg.W), ALLELE_POOLS.W)],
+  };
+  // O is X-linked. Mom contributes one of her two Os, dad's contribution depends on kitten sex.
+  // Female kitten gets X from mom + X from dad → 2 alleles.
+  // Male kitten gets X from mom + Y from dad → 1 allele.
+  if (kittenSex === 'F') {
+    g.O = [maybeMutate(pickAllele(mg.O), ['O','o']), maybeMutate(dg.O[0]==='O'?'O':'o', ['O','o'])];
+  } else {
+    g.O = [maybeMutate(pickAllele(mg.O), ['O','o'])];
+  }
+  // Behavioral — midparent + drift. Low σ for realistic heritability so selection compounds.
+  const blend = (k) => clamp(((mg[k]+dg[k])/2) + gauss()*0.025, 0.02, 0.98);
+  g.boldness = blend('boldness');
+  g.sociability = blend('sociability');
+  g.playfulness = blend('playfulness');
+  g.aggression = blend('aggression');
+  g.energy = blend('energy');
+  g.appetite = blend('appetite');
+  g.size = blend('size');
+  return g;
+}
+
+function calculatePhenotype(genes, sex) {
+  // Dominant white masks everything else
+  const hasW = genes.W.includes('W');
+  if (hasW) return {
+    baseColor: 'white', baseHex: '#f0e9d2',
+    pattern: 'solid', whiteAmount: 1, longHair: genes.L.every(a=>a==='l'),
+    description: 'all white'
+  };
+
+  // Orange expression (X-linked)
+  let orangeMode;
+  if (sex === 'M') {
+    orangeMode = genes.O[0]==='O' ? 'full' : 'none';
+  } else {
+    const oCount = genes.O.filter(a=>a==='O').length;
+    orangeMode = oCount===2?'full':oCount===1?'tortie':'none';
+  }
+
+  // Non-orange base
+  const hasB = genes.B.includes('B');
+  const isDilute = genes.D.every(a=>a==='d');
+  let nonOrangeName, nonOrangeHex;
+  if (hasB) {
+    if (isDilute) { nonOrangeName='blue'; nonOrangeHex='#7a7e80'; }
+    else          { nonOrangeName='black'; nonOrangeHex='#2e2c28'; }
+  } else {
+    if (isDilute) { nonOrangeName='lilac'; nonOrangeHex='#b6a89a'; }
+    else          { nonOrangeName='chocolate'; nonOrangeHex='#5b3f30'; }
+  }
+  const orangeHex = isDilute ? '#e8c887' : '#c7733a';
+  const orangeName = isDilute ? 'cream' : 'red';
+
+  // White spotting
+  const sCount = genes.S.filter(a=>a==='S').length;
+  const whiteAmount = sCount===2 ? 0.55 : sCount===1 ? 0.22 : 0;
+
+  // Determine display name + hex
+  let baseColor, baseHex, description;
+  if (orangeMode === 'full') {
+    baseColor = orangeName;
+    baseHex = orangeHex;
+  } else if (orangeMode === 'tortie') {
+    baseColor = whiteAmount > 0 ? 'calico' : 'tortie';
+    baseHex = nonOrangeHex; // primary
+  } else {
+    baseColor = nonOrangeName;
+    baseHex = nonOrangeHex;
+  }
+
+  // Pattern: agouti shows tabby; orange always shows pattern (regardless of A)
+  const showsPattern = genes.A.includes('A') || orangeMode === 'full' || orangeMode === 'tortie';
+  let pattern = 'solid';
+  if (showsPattern) {
+    // Take first allele as expressed (simple)
+    pattern = genes.T[0];
+  }
+
+  const longHair = genes.L.every(a=>a==='l');
+
+  description = `${pattern==='solid'?'':patternName(pattern)+' '}${baseColor}${whiteAmount>0?' & white':''}${longHair?', longhair':''}`.trim();
+
+  return {
+    baseColor, baseHex, pattern, whiteAmount, longHair,
+    orangeMode, orangeHex, nonOrangeHex,
+    description
+  };
+}
+
+function patternName(p) {
+  return { Mc:'mackerel tabby', Cs:'classic tabby', Sp:'spotted tabby', Tk:'ticked tabby', solid:'solid' }[p] || '';
+}
+
+// Gene-summary tags for the setup card
+function genesToTags(genes, sex, ph) {
+  const tags = [];
+  tags.push(ph.description);
+  if (genes.boldness > 0.7) tags.push('bold');
+  else if (genes.boldness < 0.3) tags.push('timid');
+  if (genes.sociability > 0.7) tags.push('social');
+  else if (genes.sociability < 0.3) tags.push('aloof');
+  if (genes.aggression > 0.6) tags.push('aggressive');
+  if (genes.playfulness > 0.7) tags.push('playful');
+  if (genes.energy > 0.75) tags.push('high-energy');
+  if (genes.energy < 0.3) tags.push('mellow');
+  return tags;
+}
+
+// ─── CATS ─────────────────────────────────────────────────────
+function createCat({sex, genes, name, parents=null, x, y, age=0}) {
+  const ph = calculatePhenotype(genes, sex);
+  // Lifespan modified by inbreeding (computed at birth if has parents)
+  const F = parents ? inbreedingCoefficient(parents[0], parents[1]) : 0;
+  const lifeMod = 1 - F * 0.4;        // up to 40% shorter life
+  // Gaussian lifespan variance — most cluster around SENIOR_END, with long tails both ways
+  const baseLifespan = SENIOR_END + gauss() * 55;   // σ ≈ 55 weeks (~1 year)
+  const lifespan = Math.max(60, baseLifespan * lifeMod);
+  // Permanent body size — driven by the heritable 'size' gene (plus minor appetite/energy influence).
+  // This makes size genuinely heritable and lets the colony evolve toward big or small over generations.
+  const sizeGene = genes.size !== undefined ? genes.size : 0.5;
+  let bodyScale = clamp(
+    0.6 + sizeGene * 0.8 + (genes.appetite - 0.5) * 0.10 + (genes.energy - 0.5) * 0.06 + gauss() * 0.04,
+    0.45, 1.6
+  );
+  // Smaller cats live longer (less metabolic stress); larger cats burn out faster.
+  // This is a real biological trade-off and a key advantage for small body size.
+  const sizeLifeMod = 1 + (1 - bodyScale) * 0.35;   // 0.6× body ~ +14%, 1.5× body ~ -17%
+  const lifespanFinal = lifespan * sizeLifeMod;
+  const rareTraits = [];
+  // Dwarf — emerges naturally at the low tail of the size gene (heritable!)
+  if (bodyScale < 0.62) {
+    rareTraits.push('dwarf');
+  }
+  // Giant — emerges at the high tail (heritable!)
+  else if (bodyScale > 1.42) {
+    rareTraits.push('giant');
+  }
+  // Smoke (~2%) — coat has silvery wash. Modifies phenotype.
+  if (Math.random() < 0.02 && ph.baseColor !== 'white') {
+    rareTraits.push('smoke');
+    ph.smoke = true;
+    ph.baseHex = lightenHex(ph.baseHex, 0.32);
+    ph.smokeUndertint = true;
+  }
+  // Heterochromia — different eye colors (~1.5%)
+  if (Math.random() < 0.015) rareTraits.push('odd-eyed');
+  return {
+    id: id(),
+    name: name || pick(NAME_POOL),
+    sex,
+    genes,
+    phenotype: ph,
+    rareTraits,
+    age,
+    stage: ageStage(age),
+    hunger: 0.7,
+    energy: 0.85,
+    social: 0.5,
+    condition: 0.85,
+    bodyScale,
+    bornAt: state.simTime - age,
+    lifespan: lifespanFinal,
+    inbreedF: F,
+    state: 'wander',
+    stateTimer: 0,
+    x: x ?? rand(80, arenaW-80),
+    y: y ?? rand(160, arenaH-160),
+    vx: 0, vy: 0,
+    dir: rand(0, Math.PI*2),
+    targetX: null, targetY: null,
+    targetCat: null,
+    partner: null,
+    pregnantWith: null,
+    cooldownUntil: 0,
+    parents: parents,            // [momId, dadId]
+    children: [],
+    affinity: new Map(),
+    dying: false,
+    dyingT: 0,
+    dyingReason: '',
+    floatTexts: [],              // {text, t, life, dy}
+    bornFlash: 0.6,              // sparkle effect on birth
+    fightGlow: 0,                // flares red when fighting
+    fightCount: 0,               // total fights initiated/joined (for end screen)
+    postureCooldown: 0,          // sim-day countdown for aggression posture displays
+    // Estrus (females only): cycles continuously, only fertile during ESTRUS_DURATION window
+    estrusPhase: sex === 'F' ? Math.random() * ESTRUS_CYCLE_WEEKS : 0,
+    inEstrus: false,
+    // Disease
+    sick: false,
+    sickTimer: 0,            // weeks remaining until resolution
+    sickSeverity: 0,         // 0-1, affects death chance
+    immunityTimer: 0,        // weeks of post-recovery immunity
+  };
+}
+
+// First-appearance tracker — for notable cats panel
+function recordFirsts(cat) {
+  const f = state.firsts;
+  const key = cat.phenotype.baseColor;
+  if (!f[key]) f[key] = { name: cat.name, id: cat.id, day: Math.floor(state.simTime) };
+  if (cat.phenotype.longHair && !f._longhair) f._longhair = { name: cat.name, id: cat.id, day: Math.floor(state.simTime) };
+  if (cat.phenotype.pattern === 'Cs' && !f._classic) f._classic = { name: cat.name, id: cat.id, day: Math.floor(state.simTime) };
+  if (cat.phenotype.pattern === 'Sp' && !f._spotted) f._spotted = { name: cat.name, id: cat.id, day: Math.floor(state.simTime) };
+  if (cat.inbreedF > 0.2 && !f._inbred) f._inbred = { name: cat.name, id: cat.id, day: Math.floor(state.simTime) };
+}
+
+function ageStage(age) {
+  if (age < KITTEN_DAYS) return 'kitten';
+  if (age < JUVENILE_DAYS) return 'juvenile';
+  if (age < ADULT_END) return 'adult';
+  return 'senior';
+}
+
+// Rough inbreeding coefficient via ancestor overlap. Walks up 4 generations.
+// Uses parentsById (built from living + deceased) so lineage works across deaths.
+const parentsById = new Map();   // catId -> [momId, dadId] | null
+
+function recordParents(catId, parents) {
+  if (parents) parentsById.set(catId, parents);
+}
+
+function ancestors(catId, depth=4, map=new Map(), gen=0) {
+  if (depth===0 || !catId) return map;
+  const parents = parentsById.get(catId);
+  if (!parents) return map;
+  for (const pid of parents) {
+    if (pid != null) {
+      const prev = map.get(pid) ?? Infinity;
+      if (gen+1 < prev) map.set(pid, gen+1);
+      ancestors(pid, depth-1, map, gen+1);
+    }
+  }
+  return map;
+}
+function inbreedingCoefficient(momId, dadId) {
+  const ma = ancestors(momId);
+  const da = ancestors(dadId);
+  ma.set(momId, 0); da.set(dadId, 0);
+  let F = 0;
+  for (const [aId, mGen] of ma) {
+    if (da.has(aId)) {
+      const dGen = da.get(aId);
+      F += 0.5 ** (mGen + dGen + 1);
+    }
+  }
+  return Math.min(0.6, F);
+}
+
+// ─── DRAWING CATS ─────────────────────────────────────────────
+// Compute trait-driven color tint for a cat — used to subtly shift body hue
+// so the colony's gene composition is visible at a glance.
+function computeTraitTint(cat) {
+  if (cat.stage === 'kitten') return null;
+  const g = cat.genes;
+  const traits = [
+    { val: g.aggression - 0.5,  hex: [195, 70, 40] },     // aggressive → warm red
+    { val: g.boldness - 0.5,    hex: [205, 130, 50] },    // bold → orange
+    { val: g.energy - 0.5,      hex: [220, 195, 70] },    // energetic → yellow
+    { val: g.sociability - 0.5, hex: [110, 175, 110] },   // social → green
+    { val: g.playfulness - 0.5, hex: [175, 125, 200] },   // playful → violet
+  ];
+  let strongest = null, strongestAbs = 0.12;   // lower threshold — more cats tint
+  for (const t of traits) {
+    if (Math.abs(t.val) > strongestAbs) { strongestAbs = Math.abs(t.val); strongest = t; }
+  }
+  if (!strongest) return null;
+  // Amount: scales with how far from 0.5 the trait is. Up to ~0.45 at extreme.
+  const amount = Math.min(0.45, (strongestAbs - 0.10) * 1.2);
+  // Negative direction → cool blue tint (timid, aloof, mellow)
+  const tintHex = strongest.val > 0 ? strongest.hex : [85, 125, 165];
+  return { rgb: tintHex, amount };
+}
+
+// Mix two hex colors. Returns mixed hex.
+function mixHex(baseHex, tintRgb, amount) {
+  // Parse base hex into rgb
+  if (!baseHex || !baseHex.startsWith('#')) return baseHex;
+  let r = parseInt(baseHex.slice(1,3), 16);
+  let g = parseInt(baseHex.slice(3,5), 16);
+  let b = parseInt(baseHex.slice(5,7), 16);
+  // Blend toward tint
+  r = Math.round(r + (tintRgb[0] - r) * amount);
+  g = Math.round(g + (tintRgb[1] - g) * amount);
+  b = Math.round(b + (tintRgb[2] - b) * amount);
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function drawCat(ctx, cat, x, y, scale=1, dir=0) {
+  const ph = cat.phenotype;
+  const isKitten = cat.stage === 'kitten';
+  const kittenScale = isKitten ? 0.55 + Math.min(0.45, cat.age/KITTEN_DAYS*0.45) : 1;
+  // Physical size: kitten growth × permanent gene-driven bodyScale × condition (gauntness)
+  const bScale = cat.bodyScale || 1;
+  const condition = cat.condition !== undefined ? cat.condition : 1;
+  const condShrink = 0.88 + condition * 0.12;     // very gaunt cats are ~12% smaller
+  const s = scale * kittenScale * bScale * condShrink;
+  // Long hair adds visual width
+  const fluff = (ph.longHair ? 1.18 : 1) * (0.95 + condition*0.05);
+  // Senior cats dim slightly (last 25% of life)
+  const seniorFade = cat.stage === 'senior' ? clamp(1 - (cat.age - SENIOR_END * 0.75) / (cat.lifespan * 0.25), 0.7, 1) : 1;
+  // Pregnant belly extra width factor — grows over the 10 days
+  const pregBelly = cat.pregnantWith ? (1 + (1 - cat.pregnantWith.daysLeft/PREGNANCY_DAYS) * 0.45) : 1;
+
+  // Aggression glow (drawn first, under everything) — only on combat
+  if (cat.fightGlow > 0.01) {
+    ctx.save();
+    ctx.fillStyle = `rgba(200,60,40,${cat.fightGlow*0.4})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 22*s*fluff, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Sick aura — pale greenish ring (kept because it's a state, not a trait)
+  if (cat.sick) {
+    ctx.save();
+    ctx.fillStyle = `rgba(140,170,90,0.18)`;
+    ctx.beginPath();
+    ctx.arc(x, y, 18*s*fluff, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // TRAIT TINT — temporarily shift the phenotype's base color toward a trait color.
+  // This is the visible-evolution mechanic: a colony drifting toward boldness becomes warmer-toned.
+  const tint = computeTraitTint(cat);
+  let origBaseHex = null, origOrangeHex = null;
+  if (tint) {
+    origBaseHex = ph.baseHex;
+    ph.baseHex = mixHex(ph.baseHex, tint.rgb, tint.amount);
+    if (ph.orangeHex) {
+      origOrangeHex = ph.orangeHex;
+      ph.orangeHex = mixHex(ph.orangeHex, tint.rgb, tint.amount * 0.7);
+    }
+  }
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(dir);
+  // Stack opacity: senior fade × sick desaturation alpha
+  let alpha = 1;
+  if (seniorFade < 1) alpha *= seniorFade;
+  if (cat.sick) alpha *= 0.72;
+  if (alpha < 1) ctx.globalAlpha = alpha;
+
+  // soft shadow
+  ctx.fillStyle = 'rgba(70,50,20,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4*s, 16*s*fluff*pregBelly, 5*s*pregBelly, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // tail (drawn first, behind body)
+  const tailLen = (ph.longHair?16:13)*s;
+  ctx.strokeStyle = ph.baseHex;
+  ctx.lineWidth = (ph.longHair?5:3.5)*s;
+  ctx.lineCap = 'round';
+  const tailWag = Math.sin(state.simTime*4 + cat.id) * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(-12*s, 0);
+  ctx.quadraticCurveTo(-18*s, -3*s + tailWag*5, -14*s -tailLen*0.4, tailWag*8);
+  ctx.stroke();
+
+  // body
+  drawCoat(ctx, cat, s, fluff, pregBelly);
+
+  // head (front)
+  const headR = 7.5*s;
+  ctx.save();
+  ctx.translate(10*s, 0);
+
+  // ears
+  ctx.fillStyle = ph.baseHex;
+  ctx.beginPath();
+  ctx.moveTo(-3*s, -headR*0.6);
+  ctx.lineTo(-5*s, -headR*1.4);
+  ctx.lineTo(-1*s, -headR*0.85);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-3*s, headR*0.6);
+  ctx.lineTo(-5*s, headR*1.4);
+  ctx.lineTo(-1*s, headR*0.85);
+  ctx.closePath();
+  ctx.fill();
+
+  // head circle
+  ctx.fillStyle = ph.baseHex;
+  ctx.beginPath();
+  ctx.arc(0, 0, headR, 0, Math.PI*2);
+  ctx.fill();
+
+  // tortie/calico head patch (clipped to head)
+  if (ph.baseColor === 'tortie' || ph.baseColor === 'calico') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, headR, 0, Math.PI*2);
+    ctx.clip();
+    ctx.fillStyle = ph.orangeHex;
+    ctx.beginPath();
+    ctx.arc(headR*0.3, -headR*0.3, headR*0.55, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // head white blaze if white spotting
+  if (ph.whiteAmount > 0.2) {
+    ctx.fillStyle = '#f3ecd5';
+    ctx.beginPath();
+    ctx.ellipse(headR*0.4, 0, headR*0.55, headR*0.35, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // eyes
+  const eyeOpen = cat.state === 'sleep' ? 0.15 : 1;
+  ctx.fillStyle = '#2a2418';
+  ctx.beginPath();
+  ctx.ellipse(headR*0.45, -headR*0.35, 1.3*s, 1.5*s*eyeOpen, 0, 0, Math.PI*2);
+  ctx.ellipse(headR*0.45, headR*0.35, 1.3*s, 1.5*s*eyeOpen, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // tiny nose
+  if (s > 0.5) {
+    ctx.fillStyle = '#c47080';
+    ctx.beginPath();
+    ctx.arc(headR*0.95, 0, 0.9*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  ctx.restore();
+
+  // birth sparkle
+  if (cat.bornFlash > 0) {
+    ctx.fillStyle = `rgba(212, 168, 90, ${cat.bornFlash})`;
+    for (let i=0;i<5;i++) {
+      const a = (i/5)*Math.PI*2 + state.simTime*2;
+      const r = 14 + cat.bornFlash*8;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a)*r, y + Math.sin(a)*r, 1.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // state icon
+  if (s > 0.6 && cat.state !== 'wander' && cat.state !== 'sleep') {
+    const icon = STATE_ICONS[cat.state];
+    if (icon) {
+      ctx.font = `${14*scale}px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(icon, x, y - 18*scale);
+    }
+  }
+  if (cat.state === 'sleep') {
+    ctx.font = `${12*scale}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(60,50,30,${0.4 + 0.3*Math.sin(state.simTime*3)})`;
+    ctx.fillText('z', x + 14*scale + Math.sin(state.simTime*2)*2, y - 12*scale);
+  }
+
+  // pregnant indicator (small dot)
+  if (cat.pregnantWith) {
+    ctx.fillStyle = 'rgba(180,90,100,0.8)';
+    ctx.beginPath();
+    ctx.arc(x, y - 14*scale, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // float texts (near-miss / event flashes)
+  for (const ft of cat.floatTexts) {
+    const a = 1 - ft.t/ft.life;
+    if (a <= 0) continue;
+    ctx.font = `italic ${12*scale}px Fraunces, serif`;
+    ctx.fillStyle = `rgba(60,50,30,${a*0.9})`;
+    ctx.textAlign = 'center';
+    ctx.fillText(ft.text, x, y - 22*scale - ft.t*14);
+  }
+  // Restore original phenotype colors that we temporarily tinted
+  if (origBaseHex !== null) ph.baseHex = origBaseHex;
+  if (origOrangeHex !== null) ph.orangeHex = origOrangeHex;
+}
+
+const STATE_ICONS = {
+  eat: '🐟', seek_food: '', mate: '♥', court: '♥',
+  flee: '!', fight: '⚡', groom: '✿', play: '♪',
+  pregnant: '', social: ''
+};
+
+function drawCoat(ctx, cat, s, fluff, pregBelly=1) {
+  const ph = cat.phenotype;
+  const bodyW = 14 * s * fluff * pregBelly;
+  const bodyH = 9 * s * fluff * pregBelly;
+  // LOD: skip detailed pattern overlays when there are many cats (cheap rendering pass)
+  const simplifyPatterns = state.cats.length > 400;
+
+  // Longhair fluff — drawn FIRST so it sits behind the body, flush against it (no gap)
+  if (ph.longHair) {
+    ctx.save();
+    ctx.fillStyle = ph.baseHex;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bodyW*1.18, bodyH*1.28, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // base body
+  ctx.fillStyle = ph.baseHex;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // tortie/calico — orange patches (clipped to body to prevent off-body tumors)
+  if (ph.baseColor === 'tortie' || ph.baseColor === 'calico') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
+    ctx.clip();
+    ctx.fillStyle = ph.orangeHex;
+    // Deterministic patches based on cat id for stability
+    const seed = cat.id * 9301 + 49297;
+    const r = (n) => { const x = Math.sin(seed + n*12.9898) * 43758.5453; return x - Math.floor(x); };
+    const patches = simplifyPatterns ? 2 : 3;
+    for (let i=0;i<patches;i++) {
+      const px = (r(i*2)-0.5)*bodyW*1.2;
+      const py = (r(i*2+1)-0.5)*bodyH*1.0;
+      ctx.beginPath();
+      ctx.ellipse(px, py, bodyW*0.32, bodyH*0.38, r(i*3)*Math.PI, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // tabby pattern overlay (skipped in LOD mode)
+  if (ph.pattern !== 'solid' && !simplifyPatterns) {
+    ctx.save();
+    // Clip to body ellipse
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
+    ctx.clip();
+    const darker = darken(ph.baseHex, 0.4);
+    ctx.fillStyle = darker;
+    ctx.strokeStyle = darker;
+    ctx.lineCap = 'round';
+    if (ph.pattern === 'Mc') {
+      // Mackerel — vertical-ish stripes
+      ctx.lineWidth = 1.2*s;
+      for (let i=-3; i<=3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i*bodyW*0.25, -bodyH);
+        ctx.quadraticCurveTo(i*bodyW*0.25 + 1, 0, i*bodyW*0.25, bodyH);
+        ctx.stroke();
+      }
+    } else if (ph.pattern === 'Cs') {
+      // Classic — swirl
+      ctx.lineWidth = 1.5*s;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, bodyW*0.55, bodyH*0.55, 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, bodyW*0.25, bodyH*0.3, 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else if (ph.pattern === 'Sp') {
+      // Spotted
+      const seed2 = cat.id * 7919;
+      const r = (n) => { const x = Math.sin(seed2 + n*78.233) * 43758.5453; return x - Math.floor(x); };
+      for (let i=0; i<8; i++) {
+        const px = (r(i*2)-0.5)*bodyW*1.7;
+        const py = (r(i*2+1)-0.5)*bodyH*1.7;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.3*s, 0, Math.PI*2);
+        ctx.fill();
+      }
+    } else if (ph.pattern === 'Tk') {
+      // Ticked — subtle speckle
+      const seed3 = cat.id * 6151;
+      const r = (n) => { const x = Math.sin(seed3 + n*123.4) * 43758.5453; return x - Math.floor(x); };
+      for (let i=0; i<14; i++) {
+        const px = (r(i*2)-0.5)*bodyW*1.8;
+        const py = (r(i*2+1)-0.5)*bodyH*1.8;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(px, py, 0.6*s, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  // white spotting overlay
+  if (ph.whiteAmount > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
+    ctx.clip();
+    ctx.fillStyle = '#f3ecd5';
+    if (ph.whiteAmount > 0.4) {
+      // High — mostly white
+      ctx.fillRect(-bodyW*1.2, -bodyH*0.2, bodyW*2.4, bodyH*1.4);
+    } else {
+      // Belly white
+      ctx.beginPath();
+      ctx.ellipse(0, bodyH*0.5, bodyW*0.7, bodyH*0.5, 0, 0, Math.PI*2);
+      ctx.fill();
+      // chest spot
+      ctx.beginPath();
+      ctx.ellipse(bodyW*0.5, bodyH*0.3, bodyW*0.25, bodyH*0.3, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function darken(hex, amt) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  const f = 1-amt;
+  return `rgb(${Math.floor(r*f)},${Math.floor(g*f)},${Math.floor(b*f)})`;
+}
+
+function lightenHex(hex, amt) {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  const nr = Math.floor(r + (255-r)*amt);
+  const ng = Math.floor(g + (255-g)*amt);
+  const nb = Math.floor(b + (255-b)*amt);
+  return '#' + [nr,ng,nb].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// ─── FOOD & ARENA ─────────────────────────────────────────────
+function dropFood(x, y) {
+  state.food.push({
+    x, y,
+    amount: 0.65 + Math.random()*0.3,
+    bornAt: state.simTime,
+  });
+}
+
+function drawFood(ctx, f) {
+  const age = state.simTime - f.bornAt;
+  const fade = age > FOOD_LIFETIME-10 ? clamp((FOOD_LIFETIME - age)/10, 0, 1) : 1;
+  ctx.save();
+  ctx.globalAlpha = fade * 0.95;
+  ctx.fillStyle = '#9c6a3a';
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, 5*Math.sqrt(f.amount), 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(60,40,15,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawArena(ctx) {
+  // background
+  ctx.fillStyle = '#ede2c6';
+  ctx.fillRect(0, 0, arenaW, arenaH);
+  // subtle noise dots
+  ctx.fillStyle = 'rgba(120,90,40,0.04)';
+  for (let i=0;i<60;i++) {
+    const x = ((i*7919 + 11) % arenaW);
+    const y = ((i*7333 + 7) % arenaH);
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // feeding spots — soft worn patches around recurring food sources (now subtler since spread is wider)
+  for (const spot of state.feedSpots) {
+    const g = ctx.createRadialGradient(spot.x, spot.y, 0, spot.x, spot.y, 70);
+    g.addColorStop(0, 'rgba(170,120,70,0.08)');
+    g.addColorStop(0.6, 'rgba(170,120,70,0.03)');
+    g.addColorStop(1, 'rgba(170,120,70,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(spot.x, spot.y, 70, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // soft inner shadow / vignette
+  const grad = ctx.createRadialGradient(arenaW/2, arenaH/2, Math.min(arenaW,arenaH)*0.3,
+    arenaW/2, arenaH/2, Math.max(arenaW,arenaH)*0.7);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(70,50,20,0.18)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,arenaW,arenaH);
+}
+
+// ─── POPULATION DYNAMICS ──────────────────────────────────────
+// Density stress around a cat — used to modify breeding willingness, aggression
+function localDensity(cat) {
+  let n = 0;
+  forCatsNear(cat.x, cat.y, 90, (c) => {
+    if (c === cat || c.dying) return false;
+    if (dist(cat, c) < 90) n++;
+    return false;
+  });
+  return n;
+}
+
+// Season helper: 52 weeks/year, 13 weeks/season
+function deriveSeason(simTime) {
+  const week = Math.floor(simTime) % 52;
+  if (week < 13) return 'spring';
+  if (week < 26) return 'summer';
+  if (week < 39) return 'fall';
+  return 'winter';
+}
+function deriveYear(simTime) { return Math.floor(simTime / 52) + 1; }
+// Cats breed in spring & summer only (seasonal estrus)
+function isBreedingSeason() { return state.season === 'spring' || state.season === 'summer'; }
+
+// ─── ENVIRONMENTAL EVENTS ─────────────────────────────────────
+// Weather is a random walk — biases drift over time. Some eras are unlucky, some lucky.
+// No fixed region temperament; ecology is what it happens to be.
+function makeStartingWeather() {
+  return {
+    winter: 1.0, drought: 1.0, predator: 1.0, epidemic: 1.0, plentiful: 1.0,
+  };
+}
+
+// Called once per year — each weather bias drifts slightly. Over time, long stretches of
+// "lots of droughts" or "few predators" emerge naturally without being chosen.
+function driftWeather() {
+  const w = state.climate;
+  if (!w) return;
+  const keys = ['winter','drought','predator','epidemic','plentiful'];
+  for (const k of keys) {
+    // Small random walk with reversion to 1.0 (so biases don't drift to infinity)
+    const drift = (Math.random() - 0.5) * 0.25;
+    const revert = (1.0 - w[k]) * 0.08;
+    w[k] = clamp(w[k] + drift + revert, 0.5, 1.8);
+  }
+}
+
+function rollSeasonalEvent(season) {
+  // 30% chance the current event persists into this new season (a "long" event)
+  // This gives some runs multi-season droughts, prolonged epidemics, etc.
+  if (state.activeEvent && Math.random() < 0.3) {
+    // Persist but log a continuation message
+    logEvent(`The ${state.activeEvent === 'harshWinter' ? 'harsh winter' :
+                    state.activeEvent === 'plentiful' ? 'abundance' : state.activeEvent} continues.`, 'death');
+    return;
+  }
+  state.activeEvent = null;
+  state.activeEventMessage = '';
+  if (state.year < 2) return;
+  const climate = state.climate || makeStartingWeather();
+  const roll = Math.random();
+  // Apply climate multipliers — each region has more or less of each event type
+  if (season === 'winter') {
+    const t1 = 0.20 * climate.winter;
+    if (roll < t1) {
+      state.activeEvent = 'harshWinter';
+      state.activeEventMessage = 'A harsh winter descends. The weak will not survive.';
+      logEvent(state.activeEventMessage, 'death');
+    }
+  } else if (season === 'spring') {
+    const t1 = 0.18 * climate.plentiful;
+    const t2 = t1 + 0.15 * climate.predator;
+    const t3 = t2 + 0.06 * climate.epidemic;
+    if (roll < t1) {
+      state.activeEvent = 'plentiful';
+      state.activeEventMessage = 'A plentiful spring. Prey is abundant.';
+      logEvent(state.activeEventMessage, 'birth');
+    } else if (roll < t2) {
+      state.activeEvent = 'predator';
+      state.activeEventMessage = 'A predator stalks the colony.';
+      logEvent(state.activeEventMessage, 'death');
+    } else if (roll < t3) {
+      state.activeEvent = 'epidemic';
+      state.activeEventMessage = 'Illness sweeps through the colony.';
+      logEvent(state.activeEventMessage, 'death');
+    }
+  } else if (season === 'summer') {
+    const t1 = 0.14 * climate.drought;
+    const t2 = t1 + 0.12 * climate.epidemic;
+    const t3 = t2 + 0.10 * climate.predator;
+    if (roll < t1) {
+      state.activeEvent = 'drought';
+      state.activeEventMessage = 'A summer drought has set in. Food is scarce.';
+      logEvent(state.activeEventMessage, 'death');
+    } else if (roll < t2) {
+      state.activeEvent = 'epidemic';
+      state.activeEventMessage = 'Illness sweeps through the colony.';
+      logEvent(state.activeEventMessage, 'death');
+    } else if (roll < t3) {
+      state.activeEvent = 'predator';
+      state.activeEventMessage = 'A predator stalks the colony.';
+      logEvent(state.activeEventMessage, 'death');
+    }
+  } else if (season === 'fall') {
+    const t1 = 0.18 * climate.plentiful;
+    const t2 = t1 + 0.08 * climate.drought;
+    if (roll < t1) {
+      state.activeEvent = 'plentiful';
+      state.activeEventMessage = 'An abundant fall harvest. Cats fatten for winter.';
+      logEvent(state.activeEventMessage, 'birth');
+    } else if (roll < t2) {
+      state.activeEvent = 'drought';
+      state.activeEventMessage = 'A poor harvest. Food is thin going into winter.';
+      logEvent(state.activeEventMessage, 'death');
+    }
+  }
+  // Record event start in the timeline for chart markers
+  if (state.activeEvent) {
+    state.eventTimeline.push({
+      simTime: state.simTime,
+      event: state.activeEvent,
+      season: season,
+      message: state.activeEventMessage,
+    });
+  }
+}
+
+// Per-tick environmental effects applied to a cat.
+// CRITICAL: each event must select FOR some traits and AGAINST others.
+// No trait should be uniformly beneficial — that's how trade-offs make evolution interesting.
+function applyEnvironmentalPressure(cat, dt) {
+  if (cat.stage === 'kitten' || cat.dying) return;
+  const evt = state.activeEvent;
+  const g = cat.genes;
+  // Scale mortality with population — at high pop, a "harsh winter" should actually cull noticeably
+  const popScale = clamp(state.cats.length / 200, 1, 4);
+
+  // ── Winter background: cold favors high energy + larger bodies ──
+  if (state.season === 'winter') {
+    const coldVuln = (1 - g.energy);
+    cat.hunger = clamp(cat.hunger - 0.012 * coldVuln * dt, 0, 1);
+    if (cat.stage === 'senior') cat.hunger = clamp(cat.hunger - 0.008*dt, 0, 1);
+  }
+
+  // ── HARSH WINTER ──
+  // LOSERS: low-energy, small, low-condition cats die. SHARP mortality.
+  // WINNERS: high-energy + larger cats — also gain a slight condition bonus from surviving (toughens up)
+  if (evt === 'harshWinter') {
+    const vuln = (1 - g.energy) * 0.7 + (1 - (cat.condition||1)) * 0.3;
+    const sizeBenefit = clamp((cat.bodyScale - 0.85), 0, 0.4);
+    const baseRisk = cat.stage === 'senior' ? 0.0040 : 0.0014;
+    const risk = baseRisk * dt * vuln * (1 - sizeBenefit) * popScale;
+    if (Math.random() < risk) {
+      logEvent(`${cat.name} did not survive the winter`, 'death');
+      triggerDeath(cat, 'harsh winter');
+      return;
+    }
+    // Survivors with strong cold-tolerance build condition slightly (hardy adaptation)
+    if (g.energy > 0.65 && cat.bodyScale > 1) {
+      cat.condition = clamp(cat.condition + 0.002 * dt, 0.45, 1);
+    }
+  }
+
+  // ── PREDATOR ──
+  // LOSERS: bold non-aggressive cats wander into danger; LARGE cats are easier to catch (less nimble)
+  // WINNERS: aggressive defenders fight back; SMALL cats are nimble and evade. Multiple survival paths.
+  else if (evt === 'predator') {
+    const exposureRisk = clamp((g.boldness - 0.35), 0, 0.65);
+    const defense = clamp(g.aggression - 0.3, 0, 0.7) * cat.bodyScale;
+    // Small cats dodge — agility bonus for bodyScale below 1
+    const agility = clamp((1 - cat.bodyScale), 0, 0.45);
+    const netRisk = (exposureRisk - defense * 0.8 - agility * 0.6) * 0.005 * dt * popScale;
+    if (netRisk > 0 && Math.random() < netRisk) {
+      logEvent(`${cat.name} was taken by a predator`, 'death');
+      triggerDeath(cat, 'predator');
+      return;
+    }
+  }
+
+  // ── DROUGHT ──
+  // LOSERS: high-appetite large cats — fastest to starve
+  // WINNERS: small low-appetite cats — survive on little. Bold cats forage further (compensates).
+  else if (evt === 'drought') {
+    // Vulnerability = appetite + body size, reduced by boldness (better foragers in lean times)
+    const droughtVuln = (g.appetite - 0.4) * 0.7 + (cat.bodyScale - 0.9) * 0.6 - (g.boldness - 0.5) * 0.3;
+    if (droughtVuln > 0) {
+      cat.hunger = clamp(cat.hunger - 0.04 * droughtVuln * dt, 0, 1);
+      if (droughtVuln > 0.3 && Math.random() < 0.0012 * dt * droughtVuln * popScale) {
+        logEvent(`${cat.name} wasted away in the drought`, 'death');
+        triggerDeath(cat, 'drought');
+        return;
+      }
+    }
+    // Small efficient cats actually gain a bit of condition relative to others
+    if (droughtVuln < -0.1) cat.condition = clamp(cat.condition + 0.001*dt, 0.45, 1);
+  }
+
+  // ── EPIDEMIC ──
+  // LOSERS: high-sociability cats spend more time near others, catch faster (disease tick handles)
+  // WINNERS: aloof cats avoid crowds (existing wander drift), so disease rolls less often for them
+  // We ALSO add direct epidemic mortality scaling with sociability for non-sick cats —
+  // even brief contact with sick cats by social cats is more often lethal.
+  else if (evt === 'epidemic') {
+    if (g.sociability > 0.55 && !cat.sick && (cat.immunityTimer || 0) <= 0) {
+      // Crowd-loving cats can catch and die without going through long sickness chain
+      const risk = (g.sociability - 0.4) * 0.0008 * dt * popScale;
+      if (Math.random() < risk) {
+        logEvent(`${cat.name} succumbed to the plague`, 'death');
+        triggerDeath(cat, 'plague');
+        return;
+      }
+    }
+  }
+
+  // ── PLENTIFUL ──
+  // No mortality, but big bold appetite-driven cats benefit MORE from abundance:
+  // they fatten, build condition, and (via litter-size code) reproduce more.
+  else if (evt === 'plentiful') {
+    const benefit = (g.appetite - 0.4) * 0.5 + (g.boldness - 0.4) * 0.3;
+    if (benefit > 0) {
+      cat.condition = clamp(cat.condition + 0.005 * benefit * dt, 0.45, 1);
+    }
+  }
+}
+
+// ─── BEHAVIOR ─────────────────────────────────────────────────
+// ─── SPATIAL INDEX ────────────────────────────────────────────
+// Built once per tick. Queries only inspect cells within range
+// instead of every cat. Critical for performance at high pop.
+const SPATIAL_CELL = 100;            // cell size in logical px
+let spatialGrid = new Map();         // "cx,cy" → array of cats
+let spatialCellsW = 0, spatialCellsH = 0;
+let catById = new Map();             // O(1) cat lookup by id
+
+function rebuildSpatialIndex() {
+  spatialGrid.clear();
+  catById.clear();
+  spatialCellsW = Math.ceil(arenaW / SPATIAL_CELL);
+  spatialCellsH = Math.ceil(arenaH / SPATIAL_CELL);
+  for (const c of state.cats) {
+    catById.set(c.id, c);
+    if (c.dying) continue;
+    const cx = Math.floor(c.x / SPATIAL_CELL);
+    const cy = Math.floor(c.y / SPATIAL_CELL);
+    const key = cx + ',' + cy;
+    let bucket = spatialGrid.get(key);
+    if (!bucket) { bucket = []; spatialGrid.set(key, bucket); }
+    bucket.push(c);
+  }
+}
+
+// Iterate cats whose grid cells overlap a circle of radius r around (x,y).
+// callback(cat) — return true to short-circuit (early exit).
+function forCatsNear(x, y, r, callback) {
+  const reach = Math.ceil(r / SPATIAL_CELL);
+  const cx = Math.floor(x / SPATIAL_CELL);
+  const cy = Math.floor(y / SPATIAL_CELL);
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const bucket = spatialGrid.get((cx+dx) + ',' + (cy+dy));
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        if (callback(bucket[i])) return;
+      }
+    }
+  }
+}
+
+function findNearest(cat, predicate, maxDist=Infinity) {
+  let best = null, bestD = maxDist;
+  if (maxDist === Infinity || maxDist > Math.max(arenaW, arenaH)) {
+    // Unbounded — fall back to full sweep (rare)
+    for (const c of state.cats) {
+      if (c === cat || c.dying) continue;
+      if (!predicate(c)) continue;
+      const d = dist(cat, c);
+      if (d < bestD) { best = c; bestD = d; }
+    }
+  } else {
+    // Bounded — use spatial grid (fast path for the common case)
+    forCatsNear(cat.x, cat.y, maxDist, (c) => {
+      if (c === cat || c.dying) return false;
+      if (!predicate(c)) return false;
+      const d = dist(cat, c);
+      if (d < bestD) { best = c; bestD = d; }
+      return false;
+    });
+  }
+  return { target: best, d: bestD };
+}
+
+function findNearestFood(cat) {
+  let best = null, bestD = Infinity;
+  for (const f of state.food) {
+    const d = Math.hypot(cat.x-f.x, cat.y-f.y);
+    if (d < bestD) { best = f; bestD = d; }
+  }
+  return { target: best, d: bestD };
+}
+
+function chooseAction(cat) {
+  if (cat.dying) return;
+  if (cat.stage === 'kitten') {
+    const mom = cat.parents ? (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying && !_m._remove ? _m : null; })() : null;
+    // Older kittens (weaning age) can also eat solid food if hungry — saves them when mom is busy
+    if (cat.age > 7 && cat.hunger < 0.55) {
+      const f = findNearestFood(cat);
+      if (f.target && f.d < 240) {
+        cat.state = 'seek_food'; cat.targetX = f.target.x; cat.targetY = f.target.y; return;
+      }
+    }
+    // Hungry kittens MUST find mom — overrides sleep
+    if (cat.hunger < 0.6 && mom) {
+      cat.state = 'follow_mom'; cat.targetCat = mom; return;
+    }
+    if (cat.energy < 0.3 || (cat.state === 'sleep' && cat.energy < 0.9)) { cat.state = 'sleep'; return; }
+    // Stick close to mom even when not hungry
+    if (mom && dist(cat, mom) > 90) { cat.state = 'follow_mom'; cat.targetCat = mom; return; }
+    if (Math.random() < 0.02 && cat.genes.playfulness > 0.4) {
+      // play near siblings
+      const sib = findNearest(cat, c => c.parents && cat.parents && c.parents[0] === cat.parents[0] && c.stage === 'kitten', 80);
+      if (sib.target) { cat.state = 'play'; cat.targetCat = sib.target; cat.stateTimer = 2 + Math.random()*2; return; }
+    }
+    cat.state = 'wander';
+    return;
+  }
+
+  // Pregnant → eat opportunistically, more aggressively than non-pregnant
+  if (cat.pregnantWith) {
+    if (cat.hunger < 0.65) {
+      const f = findNearestFood(cat);
+      if (f.target) { cat.state='seek_food'; cat.targetX=f.target.x; cat.targetY=f.target.y; return; }
+    }
+    cat.state = 'wander'; return;
+  }
+
+  // Adults: seek food when hungry. High-appetite cats seek at higher threshold (eat more eagerly)
+  const seekThreshold = 0.45 + cat.genes.appetite * 0.25;   // range 0.45-0.70
+  if (cat.hunger < seekThreshold) {
+    const f = findNearestFood(cat);
+    if (f.target) { cat.state='seek_food'; cat.targetX=f.target.x; cat.targetY=f.target.y; return; }
+  }
+  // Low energy → sleep. Duration scales inversely with energy gene: low-energy cats sleep longer.
+  if (cat.energy < 0.2) {
+    const baseSleep = 6 + Math.random()*6;        // 6-12 base
+    const lengthMult = 1.6 - cat.genes.energy;    // high energy = ~0.6×, low = ~1.6×
+    cat.state='sleep';
+    cat.stateTimer = baseSleep * lengthMult;
+    return;
+  }
+  // Continue sleep
+  if (cat.state==='sleep' && cat.energy<0.9 && cat.stateTimer>0) return;
+
+  // Mate opportunity (adult, willing, not on cooldown). No artificial cap — mortality regulates pop.
+  if ((cat.stage==='adult' || cat.stage==='senior') &&
+      state.simTime > cat.cooldownUntil &&
+      cat.hunger > 0.4 && cat.energy > 0.35) {
+    const willingThreshold = 0.35 - cat.genes.sociability*0.2 - cat.genes.playfulness*0.1;
+    if (Math.random() > willingThreshold) {
+      const partner = findNearest(cat, c =>
+        c.sex !== cat.sex &&
+        (c.stage==='adult' || c.stage==='senior') &&
+        !c.pregnantWith &&
+        state.simTime > c.cooldownUntil &&
+        c.hunger > 0.4 && c.energy > 0.35
+      , 220);
+      if (partner.target) {
+        const female = cat.sex === 'F' ? cat : partner.target;
+        if (female.inEstrus) {
+          // Fitness term uses CONDITION only — not body size. Body size has its own
+          // separate trade-offs (fights/cold favor big; litters/lifespan/drought favor small).
+          // Including bodyScale here would double-count and bias selection toward large.
+          const partnerFitness = (partner.target.condition || 1);
+          const myFitness = (cat.condition || 1);
+          const p = partner.target.genes;
+          const c = cat.genes;
+          const traitDist = (Math.abs(c.boldness - p.boldness)
+                           + Math.abs(c.sociability - p.sociability)
+                           + Math.abs(c.energy - p.energy)) / 3;
+          const similarity = 1 - traitDist;
+          let compat = 0.45 + similarity * 0.25
+                            + (cat.genes.sociability + p.sociability)/2 * 0.2;
+          compat *= clamp(Math.pow((partnerFitness * myFitness), 0.8), 0.4, 1.6);
+          if (Math.random() < compat) {
+            cat.state='court';
+            cat.targetCat = partner.target;
+            cat.stateTimer = 0;
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // Social drive
+  if (cat.social < 0.5 && cat.genes.sociability > 0.4) {
+    const buddy = findNearest(cat, c => c.stage!=='kitten' && !c.pregnantWith && c.state!=='sleep', 200);
+    if (buddy.target) {
+      // Decide interaction type from compatibility
+      const intent = decideInteraction(cat, buddy.target);
+      if (intent) { cat.state=intent; cat.targetCat=buddy.target; cat.stateTimer=0; return; }
+    }
+  }
+  // Default wander
+  cat.state='wander';
+}
+
+function decideInteraction(a, b) {
+  // Aggression: aggressive bold cats may pick fights
+  if (a.genes.aggression > 0.55 && a.genes.boldness > b.genes.boldness + 0.15 && Math.random()<0.4) {
+    return 'fight';
+  }
+  // Two playful cats — chase/bat (takes priority over routine grooming)
+  if (a.genes.playfulness > 0.55 && b.genes.playfulness > 0.5) {
+    return 'play';
+  }
+  // Friendly social — groom or hang out
+  const friendly = (a.genes.sociability + b.genes.sociability) / 2;
+  if (friendly > 0.55) return Math.random() < 0.45 ? 'groom' : 'social';
+  return 'social';
+}
+
+// ─── UPDATE TICK ──────────────────────────────────────────────
+function updateCat(cat, dt) {
+  if (cat.dying) {
+    cat.dyingT += dt / SIM_DAY_REAL_SEC * state.speed * 0.6;
+    if (cat.dyingT >= 3.5) cat._remove = true;
+    return;
+  }
+
+  cat.age += dt;
+  cat.bornFlash = Math.max(0, cat.bornFlash - dt*0.5);
+  cat.fightGlow = Math.max(0, cat.fightGlow - dt*0.6);
+  cat.postureCooldown = Math.max(0, (cat.postureCooldown || 0) - dt);
+  const prevStage = cat.stage;
+  cat.stage = ageStage(cat.age);
+  if (cat.stage !== prevStage && prevStage) {
+    if (cat.stage === 'juvenile')    logEvent(`${cat.name} is no longer a kitten`, 'event');
+    else if (cat.stage === 'adult')  logEvent(`${cat.name} is fully grown`, 'event');
+    else if (cat.stage === 'senior') logEvent(`${cat.name} is growing old`, 'event');
+  }
+
+  // Apply seasonal/event environmental pressure (cold, drought, predators, etc.)
+  applyEnvironmentalPressure(cat, dt);
+  if (cat.dying) return;   // env effects may have killed cat
+
+  // Passive aggression posture: aggressive cats show warning when near other adults
+  if (cat.stage !== 'kitten' && !cat.dying && cat.postureCooldown <= 0 &&
+      cat.genes.aggression > 0.55 && cat.state !== 'fight' && cat.state !== 'flee') {
+    let nearbyAdult = null;
+    forCatsNear(cat.x, cat.y, 55, (c) => {
+      if (c === cat || c.dying || c.stage === 'kitten') return false;
+      if (dist(cat, c) < 55) { nearbyAdult = c; return true; }   // short-circuit
+      return false;
+    });
+    if (nearbyAdult) {
+      cat.floatTexts.push({text: '〰', t: 0, life: 1.4});
+      cat.postureCooldown = 5 + Math.random()*4;
+      if (cat.genes.aggression > 0.7) {
+        const dx = nearbyAdult.x - cat.x, dy = nearbyAdult.y - cat.y;
+        const d = Math.hypot(dx, dy) || 1;
+        nearbyAdult.vx += (dx/d) * 0.6;
+        nearbyAdult.vy += (dy/d) * 0.6;
+      }
+    }
+  }
+  // Aloof posture: very low-sociability cats show a "leave me alone" indicator
+  if (cat.stage !== 'kitten' && !cat.dying && cat.postureCooldown <= 0 &&
+      cat.genes.sociability < 0.25 && cat.state === 'wander') {
+    let crowded = 0;
+    forCatsNear(cat.x, cat.y, 45, (c) => {
+      if (c === cat || c.dying) return false;
+      if (dist(cat, c) < 45) crowded++;
+      return false;
+    });
+    if (crowded >= 2) {
+      cat.floatTexts.push({text: '·', t: 0, life: 1.2});
+      cat.postureCooldown = 7 + Math.random()*5;
+    }
+  }
+
+  // float texts decay
+  for (const ft of cat.floatTexts) ft.t += dt;
+  cat.floatTexts = cat.floatTexts.filter(ft => ft.t < ft.life);
+
+  // Needs decay (per sim-week)
+  // Hunger drain scales with body size — bigger cats burn more.
+  // This creates real trade-off: big cats win fights+mates but die first in drought/winter.
+  let hungerDrain = (0.030 + cat.genes.appetite * 0.030) * Math.pow(cat.bodyScale, 1.5);
+  if (cat.stage === 'kitten') hungerDrain *= 0.35;
+  if (cat.pregnantWith) hungerDrain *= 1.3;
+  cat.hunger = clamp(cat.hunger - hungerDrain*dt, 0, 1);
+  const energyDrain = (cat.state==='sleep' ? -0.18 : 0.04 + cat.genes.energy*0.04);
+  cat.energy = clamp(cat.energy - energyDrain*dt, 0, 1);
+  cat.social = clamp(cat.social - 0.025*dt, 0, 1);
+
+  // Body condition tracks chronic nourishment — slow to change
+  const conditionGain = state.activeEvent === 'plentiful' ? 0.05 : 0.03;
+  if (cat.hunger < 0.3)        cat.condition = clamp(cat.condition - 0.04*dt, 0.45, 1);
+  else if (cat.hunger > 0.65)  cat.condition = clamp(cat.condition + conditionGain*dt, 0.45, 1);
+
+  // Estrus cycle (adult females only, only fertile during breeding season)
+  if (cat.sex === 'F' && cat.stage !== 'kitten' && !cat.pregnantWith) {
+    const prevEstrus = cat.inEstrus;
+    cat.estrusPhase = (cat.estrusPhase + dt) % ESTRUS_CYCLE_WEEKS;
+    cat.inEstrus = isBreedingSeason() && cat.estrusPhase < ESTRUS_DURATION;
+    if (cat.inEstrus && !prevEstrus && cat.condition > 0.55) {
+      cat.floatTexts.push({text: '♥', t: 0, life: 1.6});
+    }
+  } else {
+    cat.inEstrus = false;
+  }
+
+  // Nursing — kittens near a living mother gain hunger from her
+  let nursingFromMom = false;
+  if (cat.stage === 'kitten' && cat.parents) {
+    const mom = (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
+    if (mom && dist(cat, mom) < 35 && mom.hunger > 0.25) {
+      const transfer = 0.18 * dt;
+      cat.hunger = clamp(cat.hunger + transfer, 0, 1);
+      mom.hunger = clamp(mom.hunger - transfer*0.4, 0, 1);
+      nursingFromMom = true;
+    }
+  }
+
+  // ── Disease ──
+  // Tick immunity countdown
+  if (cat.immunityTimer && cat.immunityTimer > 0) cat.immunityTimer -= dt;
+
+  if (!cat.sick && !cat.dying && cat.stage !== 'kitten' && (cat.immunityTimer || 0) <= 0) {
+    // Base infection chance per week (much lower than before)
+    let risk = 0.00018 * dt;
+    // Epidemic event: 8× base rate during outbreak
+    if (state.activeEvent === 'epidemic') risk *= 8;
+    // Crowding raises chance — diseases spread
+    const density = localDensity(cat);
+    if (density >= 4) risk *= (1 + (density - 3) * 0.25);
+    // Seniors more vulnerable
+    if (cat.stage === 'senior') risk *= 2;
+    // Low condition weakens immune response
+    if (cat.condition < 0.55) risk *= 1.6;
+    // Nearby sick cats raise it (softened contagion)
+    let sickNearby = 0;
+    forCatsNear(cat.x, cat.y, 45, (c) => {
+      if (c === cat || !c.sick || c.dying) return false;
+      if (dist(cat, c) < 45) sickNearby++;
+      return false;
+    });
+    if (sickNearby > 0) risk *= (1 + sickNearby * 0.8);
+    if (Math.random() < risk) {
+      cat.sick = true;
+      cat.sickTimer = 3 + Math.random() * 5;
+      cat.sickSeverity = cat.stage === 'senior' ? 0.4 + Math.random()*0.3 : 0.15 + Math.random()*0.25;
+      logEvent(`${cat.name} fell ill`, 'death');
+      state.diseaseOutbreaks++;
+    }
+  }
+  if (cat.sick) {
+    cat.sickTimer -= dt;
+    cat.hunger = clamp(cat.hunger - 0.02*dt, 0, 1);
+    cat.energy = clamp(cat.energy - 0.012*dt, 0, 1);
+    if (cat.sickTimer <= 0) {
+      // Recovery vs death — higher floor so disease doesn't wipe colonies
+      let surviveChance = 0.75 + cat.condition * 0.2 - cat.sickSeverity * 0.35;
+      if (cat.stage === 'senior') surviveChance -= 0.15;
+      surviveChance = clamp(surviveChance, 0.35, 0.97);
+      if (Math.random() < surviveChance) {
+        cat.sick = false;
+        cat.sickSeverity = 0;
+        cat.immunityTimer = 50 + Math.random() * 30;   // recovered cats immune ~1 year
+        logEvent(`${cat.name} recovered`, 'event');
+      } else {
+        triggerDeath(cat, 'illness');
+        return;
+      }
+    }
+  }
+
+  // Pregnancy tick
+  if (cat.pregnantWith) {
+    cat.pregnantWith.daysLeft -= dt;
+    if (cat.pregnantWith.daysLeft <= 0) giveBirth(cat);
+  }
+
+  // Death checks
+  if (cat.age >= cat.lifespan) {
+    triggerDeath(cat, 'old age');
+    return;
+  }
+  if (cat.hunger <= 0.01) {
+    // Kittens with a living mother get a grace period — they should find her, not just die.
+    // Only starve if mom is gone or hunger has been zero for a while.
+    if (cat.stage === 'kitten' && cat.parents) {
+      const mom = (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
+      if (mom) {
+        // tick a grace counter
+        cat._starveTimer = (cat._starveTimer || 0) + dt;
+        if (cat._starveTimer < 4) {
+          // floating cry above kitten so player notices
+          if (!cat._cryShown) {
+            cat.floatTexts.push({text:'!', t:0, life:1.5});
+            cat._cryShown = true;
+            setTimeout(() => { cat._cryShown = false; }, 1500);
+          }
+        } else {
+          triggerDeath(cat, 'starvation');
+          return;
+        }
+      } else {
+        triggerDeath(cat, 'orphaned');
+        return;
+      }
+    } else {
+      triggerDeath(cat, 'starvation');
+      return;
+    }
+  } else if (cat._starveTimer) {
+    cat._starveTimer = 0;
+  }
+
+  cat.stateTimer -= dt;
+  // Re-decide every so often. At high pop, slightly lengthen cadence to ease CPU.
+  if (cat.stateTimer <= 0) {
+    chooseAction(cat);
+    const popFactor = state.cats.length > 500 ? 1.8 : state.cats.length > 200 ? 1.3 : 1;
+    cat.stateTimer = (1 + Math.random()*1.5) * popFactor;
+  }
+
+  // Clear sleep-buddy target whenever no longer sleeping
+  if (cat.state !== 'sleep' && cat._sleepTargetSet) {
+    cat._sleepTargetSet = false;
+    cat._sleepTargetX = null;
+    cat._sleepTargetY = null;
+  }
+
+  executeState(cat, dt);
+
+  // Movement
+  cat.x += cat.vx * dt * SIM_DAY_REAL_SEC * 6;
+  cat.y += cat.vy * dt * SIM_DAY_REAL_SEC * 6;
+  cat.vx *= 0.88;
+  cat.vy *= 0.88;
+  // Bounds
+  const pad = 30;
+  if (cat.x < pad) { cat.x = pad; cat.vx = Math.abs(cat.vx); }
+  if (cat.x > arenaW - pad) { cat.x = arenaW - pad; cat.vx = -Math.abs(cat.vx); }
+  if (cat.y < pad+50) { cat.y = pad+50; cat.vy = Math.abs(cat.vy); }
+  if (cat.y > arenaH - pad) { cat.y = arenaH - pad; cat.vy = -Math.abs(cat.vy); }
+
+  // direction faces motion
+  if (Math.abs(cat.vx)+Math.abs(cat.vy) > 0.1) {
+    cat.dir = Math.atan2(cat.vy, cat.vx);
+  }
+
+  // Opportunistic eating — bigger cats are more efficient (more selection pressure on body size)
+  if (cat.stage !== 'kitten' && cat.hunger < 0.85 && !cat.dying) {
+    for (let i = state.food.length - 1; i >= 0; i--) {
+      const f = state.food[i];
+      if (Math.hypot(cat.x - f.x, cat.y - f.y) < 16) {
+        // Bigger cats eat more per bite. Bold cats also more decisive eaters.
+        const biteCap = 0.6 + cat.bodyScale * 0.25 + cat.genes.boldness * 0.1;
+        const eaten = Math.min(f.amount, biteCap, 1 - cat.hunger);
+        cat.hunger = clamp(cat.hunger + eaten, 0, 1);
+        f.amount -= eaten;
+        if (f.amount <= 0.01) state.food.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+function executeState(cat, dt) {
+  // Movement speed: energy provides base, boldness adds pace
+  const speed = (0.3 + cat.genes.energy*0.6 + cat.genes.boldness*0.25) * 8;
+  switch(cat.state) {
+    case 'wander': {
+      // Bold cats: change direction less often, walk further per stride
+      // Timid cats: change direction often, short bursts, occasionally freeze
+      const boldness = cat.genes.boldness;
+      const sociability = cat.genes.sociability;
+      const reorientChance = 0.02 + (1 - boldness) * 0.08;   // timid reorients more
+      if (Math.random() < reorientChance) {
+        const swing = 0.5 + (1 - boldness) * 1.6;            // timid swings wider
+        cat.dir += (Math.random()-0.5) * swing;
+        const intensity = (0.3 + cat.genes.energy*0.5) * (0.5 + boldness*0.7);
+        cat.vx += Math.cos(cat.dir) * intensity;
+        cat.vy += Math.sin(cat.dir) * intensity;
+      }
+      // Timid cats occasionally freeze (look around)
+      if (boldness < 0.35 && Math.random() < 0.01) {
+        cat.vx *= 0.3; cat.vy *= 0.3;
+      }
+      // SPATIAL PERSONALITY BIASES — apply gentle drift forces based on traits
+      // Timid: drift toward arena edges (feel safer near walls)
+      if (boldness < 0.4) {
+        const edgeForce = (0.4 - boldness) * 0.4;
+        const dxEdge = (cat.x < arenaW/2) ? -1 : 1;
+        const dyEdge = (cat.y < arenaH/2) ? -1 : 1;
+        // Only push if not already near an edge
+        const distToEdge = Math.min(cat.x, cat.y, arenaW - cat.x, arenaH - cat.y);
+        if (distToEdge > 80) {
+          cat.vx += dxEdge * edgeForce * 0.06;
+          cat.vy += dyEdge * edgeForce * 0.06;
+        }
+      }
+      // Bold: drift slightly toward arena center / activity
+      if (boldness > 0.7) {
+        const cx = arenaW/2, cy = arenaH/2;
+        const dx = cx - cat.x, dy = cy - cat.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 60) {
+          cat.vx += (dx/d) * 0.04;
+          cat.vy += (dy/d) * 0.04;
+        }
+      }
+      // Social: drift toward nearest cat (gentle)
+      if (sociability > 0.65 && Math.random() < 0.3) {
+        const near = findNearest(cat, c => c.stage !== 'kitten' && c.state !== 'sleep', 220);
+        if (near.target && near.d > 40) {
+          const dx = near.target.x - cat.x, dy = near.target.y - cat.y;
+          const d = Math.hypot(dx, dy) || 1;
+          cat.vx += (dx/d) * 0.1 * sociability;
+          cat.vy += (dy/d) * 0.1 * sociability;
+        }
+      }
+      // Aloof: drift away from groups
+      if (sociability < 0.3) {
+        let crowdX = 0, crowdY = 0, crowdN = 0;
+        forCatsNear(cat.x, cat.y, 90, (c) => {
+          if (c === cat || c.dying) return false;
+          if (dist(cat, c) < 90) { crowdX += c.x; crowdY += c.y; crowdN++; }
+          return false;
+        });
+        if (crowdN > 1) {
+          const cx = crowdX/crowdN, cy = crowdY/crowdN;
+          const dx = cat.x - cx, dy = cat.y - cy;
+          const d = Math.hypot(dx, dy) || 1;
+          cat.vx += (dx/d) * 0.18 * (0.3 - sociability + 0.1);
+          cat.vy += (dy/d) * 0.18 * (0.3 - sociability + 0.1);
+        }
+      }
+      // ENERGY ZOOMIES — high-energy cats with energy meter full periodically burst
+      if (!cat.sick && cat.genes.energy > 0.65 && cat.energy > 0.7 && cat.stage !== 'senior') {
+        if ((cat._zoomTimer || 0) <= 0 && Math.random() < 0.004) {
+          cat._zoomTimer = 1.2 + Math.random() * 1.5;   // 1-2.5 weeks of zooming
+          cat.floatTexts.push({text: '⚡', t: 0, life: 0.8});
+        }
+        if ((cat._zoomTimer || 0) > 0) {
+          cat._zoomTimer -= dt;
+          // Strong velocity burst in current dir + small jitter
+          cat.vx += Math.cos(cat.dir) * 0.6;
+          cat.vy += Math.sin(cat.dir) * 0.6;
+          if (Math.random() < 0.15) cat.dir += (Math.random()-0.5)*1.5;
+        }
+      }
+      // PLAYFUL POUNCING — playful adults randomly bat/pounce while wandering
+      if (!cat.sick && cat.genes.playfulness > 0.6 && cat.stage !== 'kitten' && cat.stage !== 'senior'
+          && Math.random() < 0.005 * cat.genes.playfulness) {
+        // Random pounce: strong perpendicular impulse, ♪ note
+        const pounceAng = cat.dir + (Math.random()-0.5) * Math.PI;
+        cat.vx += Math.cos(pounceAng) * 2.5;
+        cat.vy += Math.sin(pounceAng) * 2.5;
+        cat.floatTexts.push({text: '♪', t: 0, life: 1});
+      }
+      break;
+    }
+    case 'sleep': {
+      // On entering sleep, look for a buddy to pile up with (mom, mate, sibling)
+      if (!cat._sleepTargetSet) {
+        cat._sleepTargetSet = true;
+        let buddyX = null, buddyY = null, buddyD = Infinity;
+        forCatsNear(cat.x, cat.y, 140, (c) => {
+          if (c === cat || c.dying || c._remove) return false;
+          if (c.state !== 'sleep') return false;
+          const d = dist(cat, c);
+          if (d < 140 && d < buddyD) {
+            buddyD = d;
+            const ang = Math.atan2(cat.y - c.y, cat.x - c.x);
+            buddyX = c.x + Math.cos(ang) * 14;
+            buddyY = c.y + Math.sin(ang) * 14;
+          }
+          return false;
+        });
+        if (buddyX !== null) {
+          cat._sleepTargetX = buddyX;
+          cat._sleepTargetY = buddyY;
+        }
+      }
+      if (cat._sleepTargetX != null) {
+        const d = Math.hypot(cat.x - cat._sleepTargetX, cat.y - cat._sleepTargetY);
+        if (d > 6) {
+          moveToward(cat, cat._sleepTargetX, cat._sleepTargetY, 2);
+        } else {
+          cat.vx *= 0.5; cat.vy *= 0.5;
+        }
+      } else {
+        cat.vx *= 0.5; cat.vy *= 0.5;
+      }
+      break;
+    }
+    case 'seek_food': {
+      // re-find food in case current was eaten
+      const f = findNearestFood(cat);
+      if (!f.target) { cat.state='wander'; break; }
+      cat.targetX = f.target.x; cat.targetY = f.target.y;
+      moveToward(cat, f.target.x, f.target.y, speed);
+      if (Math.hypot(cat.x - f.target.x, cat.y - f.target.y) < 14) {
+        // eat — bigger cats take bigger bites (consistent with opportunistic eating)
+        const biteCap = 0.6 + cat.bodyScale * 0.25 + cat.genes.boldness * 0.1;
+        const eaten = Math.min(f.target.amount, biteCap, 1 - cat.hunger);
+        cat.hunger = clamp(cat.hunger + eaten, 0, 1);
+        f.target.amount -= eaten;
+        if (f.target.amount <= 0.01) {
+          state.food.splice(state.food.indexOf(f.target), 1);
+        }
+        cat.state='wander';
+        cat.stateTimer = 1;
+      }
+      break;
+    }
+    case 'follow_mom': {
+      if (!cat.targetCat || cat.targetCat.dying || cat.targetCat._remove) { cat.state='wander'; break; }
+      moveToward(cat, cat.targetCat.x + (Math.random()-0.5)*30, cat.targetCat.y + (Math.random()-0.5)*30, speed*0.7);
+      break;
+    }
+    case 'play': {
+      if (!cat.targetCat || cat.targetCat.dying || cat.targetCat._remove) { cat.state='wander'; break; }
+      moveToward(cat, cat.targetCat.x, cat.targetCat.y, speed*1.1);
+      if (dist(cat, cat.targetCat) < 22) {
+        // playful bounce — energy expended in joy
+        cat.vx += (Math.random()-0.5)*5;
+        cat.vy += (Math.random()-0.5)*5;
+        cat.social = clamp(cat.social+0.03*dt, 0, 1);
+        if (Math.random() < 0.03) {
+          cat.floatTexts.push({text:'♪', t:0, life:1.2});
+        }
+      }
+      break;
+    }
+    case 'court': {
+      if (!cat.targetCat || cat.targetCat.dying || cat.targetCat._remove || cat.targetCat.pregnantWith) { cat.state='wander'; break; }
+      moveToward(cat, cat.targetCat.x, cat.targetCat.y, speed*0.8);
+      if (dist(cat, cat.targetCat) < 22) {
+        // Female must be in estrus for breeding to succeed
+        const female = cat.sex === 'F' ? cat : cat.targetCat;
+        if (female.inEstrus && Math.random() < 0.05) {
+          mate(cat, cat.targetCat);
+        }
+      }
+      // give up after a while
+      if (cat.stateTimer < -8) cat.state='wander';
+      break;
+    }
+    case 'social':
+    case 'groom':
+    case 'approach': {
+      if (!cat.targetCat || cat.targetCat.dying || cat.targetCat._remove) { cat.state='wander'; break; }
+      moveToward(cat, cat.targetCat.x, cat.targetCat.y, speed*0.6);
+      if (dist(cat, cat.targetCat) < 22) {
+        cat.social = clamp(cat.social+0.04*dt, 0, 1);
+        const aff = cat.affinity.get(cat.targetCat.id) || 0;
+        cat.affinity.set(cat.targetCat.id, clamp(aff + 0.05*dt, -1, 1));
+        if (cat.state==='groom' && Math.random()<0.02) {
+          cat.floatTexts.push({text:'✿', t:0, life:1.2});
+        }
+      }
+      if (cat.stateTimer < -3) cat.state='wander';
+      break;
+    }
+    case 'fight': {
+      if (!cat.targetCat || cat.targetCat.dying || cat.targetCat._remove) { cat.state='wander'; break; }
+      moveToward(cat, cat.targetCat.x, cat.targetCat.y, speed*1.2);
+      if (dist(cat, cat.targetCat) < 22) {
+        // SELECTION PRESSURE: bigger cat dominates the smaller. Damage is asymmetric.
+        const myStrength = cat.bodyScale * (0.6 + cat.genes.aggression * 0.4) * (cat.condition || 1);
+        const theirStrength = cat.targetCat.bodyScale * (0.6 + cat.targetCat.genes.aggression * 0.4) * (cat.targetCat.condition || 1);
+        const advantage = myStrength / Math.max(0.3, theirStrength);
+        // Loser takes worse damage to energy AND condition
+        cat.energy = clamp(cat.energy - 0.04*dt/advantage, 0, 1);
+        cat.targetCat.energy = clamp(cat.targetCat.energy - 0.04*dt*advantage, 0, 1);
+        cat.targetCat.condition = clamp((cat.targetCat.condition||1) - 0.04*dt*advantage, 0.3, 1);
+        // SHARPER: lethal injury chance scales steeply with mismatch
+        // advantage 1.5 = ~2%/tick, 2.0 = ~5%, 2.5+ = ~10% — meaningful culling pressure
+        if (advantage > 1.3) {
+          const lethalChance = 0.005 * dt * Math.pow(advantage - 1, 2.5);
+          if (Math.random() < lethalChance) {
+            logEvent(`${cat.targetCat.name} died from fight injuries`, 'death');
+            triggerDeath(cat.targetCat, 'injury');
+            cat.state = 'wander';
+            break;
+          }
+        }
+        const aff = cat.affinity.get(cat.targetCat.id) || 0;
+        cat.affinity.set(cat.targetCat.id, clamp(aff - 0.1*dt, -1, 1));
+        cat.fightGlow = 1.2;
+        cat.targetCat.fightGlow = 1.2;
+        cat.fightCount = (cat.fightCount || 0) + 1;
+        cat.targetCat.fightCount = (cat.targetCat.fightCount || 0) + 1;
+        cat.targetCat.state='flee';
+        cat.targetCat.targetCat = cat;
+        cat.targetCat.stateTimer = 2;
+        if (Math.random()<0.05) {
+          cat.floatTexts.push({text:'⚡', t:0, life:1});
+          logEvent(`${cat.name} scrapped with ${cat.targetCat.name}`, 'event');
+        }
+        cat.state='wander';
+      }
+      break;
+    }
+    case 'flee': {
+      if (!cat.targetCat) { cat.state='wander'; break; }
+      const dx = cat.x - cat.targetCat.x;
+      const dy = cat.y - cat.targetCat.y;
+      const d = Math.hypot(dx,dy) || 1;
+      cat.vx += (dx/d) * 1.5;
+      cat.vy += (dy/d) * 1.5;
+      if (cat.stateTimer < 0 || d > 200) cat.state='wander';
+      break;
+    }
+  }
+}
+
+function moveToward(cat, tx, ty, speed) {
+  const dx = tx - cat.x, dy = ty - cat.y;
+  const d = Math.hypot(dx, dy) || 1;
+  cat.vx += (dx/d) * speed * 0.15;
+  cat.vy += (dy/d) * speed * 0.15;
+}
+
+// ─── BREEDING ─────────────────────────────────────────────────
+function mate(a, b) {
+  const female = a.sex==='F' ? a : b;
+  const male = a.sex==='M' ? a : b;
+  if (female.pregnantWith) return;
+  female.pregnantWith = { fatherId: male.id, daysLeft: PREGNANCY_DAYS };
+  female.cooldownUntil = state.simTime + PREGNANCY_DAYS + BREED_COOLDOWN;
+  male.cooldownUntil = state.simTime + 6;
+  a.state='wander'; b.state='wander';
+  female.floatTexts.push({text:'♥', t:0, life:1.5});
+  male.floatTexts.push({text:'♥', t:0, life:1.5});
+  logEvent(`${female.name} and ${male.name} paired`, 'mate');
+}
+
+function giveBirth(mom) {
+  const father = catById.get(mom.pregnantWith.fatherId);
+  if (!father) { mom.pregnantWith = null; return; }
+  const F = inbreedingCoefficient(mom.id, father.id);
+
+  // ── LITTER SIZE: trait advantages are CONDITIONAL on environment ──
+  // No trait gives unconditional reproductive advantage. Selection direction depends on context.
+  let baseLitter = 3 + Math.floor(Math.random()*3);  // 3-5 base
+  // Maternal condition matters (well-fed moms have more), but NOT body size directly
+  const matFitness = clamp(mom.condition, 0.5, 1.2);
+  // Trait bonus is now SMALL and conditional
+  let traitBonus = 0;
+
+  // SIZE TRADE-OFF: small mothers produce MORE kittens (r-strategy: many cheap offspring),
+  // large mothers produce fewer but invest more per kitten (K-strategy: see survival advantages).
+  traitBonus += (1 - mom.bodyScale) * 0.8;   // 0.6× body → +0.3 kittens, 1.5× body → -0.4 kittens
+
+  // High boldness: better foraging in lean times, but extra predator risk loss
+  // Net: small positive in plentiful, neutral or negative under predator pressure
+  if (state.activeEvent === 'plentiful' || state.activeEvent === 'drought') {
+    traitBonus += (mom.genes.boldness - 0.5) * 0.4;
+  } else if (state.activeEvent === 'predator') {
+    traitBonus -= (mom.genes.boldness - 0.5) * 0.3;   // bold moms get caught
+  }
+  // High energy: critical in winter, costs in drought (high metabolism)
+  if (state.season === 'winter' || state.activeEvent === 'harshWinter') {
+    traitBonus += (mom.genes.energy - 0.5) * 0.7;
+  } else if (state.activeEvent === 'drought') {
+    traitBonus -= (mom.genes.energy - 0.5) * 0.3;
+  }
+  // High aggression: defends kittens from predators, but costs in peaceful times
+  if (state.activeEvent === 'predator') {
+    traitBonus += (mom.genes.aggression - 0.5) * 0.5;
+  } else if (state.activeEvent === 'plentiful' || (!state.activeEvent && state.season !== 'winter')) {
+    // In peace, aggression is mildly counter-productive (burns energy on nothing)
+    traitBonus -= (mom.genes.aggression - 0.5) * 0.15;
+  }
+  // High appetite: only beneficial when food is plentiful
+  if (state.activeEvent === 'plentiful') {
+    traitBonus += (mom.genes.appetite - 0.5) * 0.4;
+  } else if (state.activeEvent === 'drought' || state.season === 'winter') {
+    traitBonus -= (mom.genes.appetite - 0.5) * 0.5;   // high appetite suffers more in scarcity
+  }
+  // Sociability: helps in normal times (alloparenting), hurts in epidemics
+  if (state.activeEvent === 'epidemic') {
+    traitBonus -= (mom.genes.sociability - 0.5) * 0.4;
+  } else {
+    traitBonus += (mom.genes.sociability - 0.5) * 0.2;
+  }
+  // Father's body size only helps in defense scenarios
+  if (state.activeEvent === 'predator') {
+    traitBonus += (father.bodyScale - 1) * 0.3;
+  }
+
+  let litterSize = Math.max(0, Math.round(baseLitter * matFitness + traitBonus));
+  litterSize = Math.min(litterSize, 7);
+  // Postpartum mortality risk
+  const motherRisk = (litterSize - 2) * 0.02 + (1 - mom.condition) * 0.08 + F * 0.05;
+  const momWillDie = Math.random() < motherRisk;
+  if (litterSize <= 0) { mom.pregnantWith = null; return; }
+  const littermates = [];
+  for (let i=0; i<litterSize; i++) {
+    // Inbreeding may cause stillbirth. Also: extreme low-fitness moms have weaker kittens.
+    const stillbornChance = F * 0.5 + (1 - matFitness) * 0.05;
+    const sex = Math.random()<0.5 ? 'M' : 'F';
+    const kgenes = inheritGenes(mom, father, sex);
+    if (Math.random() < stillbornChance) {
+      state.stillborn++;
+      logEvent(`A kitten of ${mom.name} did not survive`, 'death');
+      continue;
+    }
+    const kitten = createCat({
+      sex, genes: kgenes,
+      name: pick(NAME_POOL),
+      parents: [mom.id, father.id],
+      x: mom.x + (Math.random()-0.5)*16,
+      y: mom.y + (Math.random()-0.5)*16,
+    });
+    parentsById.set(kitten.id, [mom.id, father.id]);
+    kitten.hunger = 0.85;
+    state.cats.push(kitten);
+    state.totalBorn++;
+    mom.children.push(kitten.id);
+    father.children.push(kitten.id);
+    // Track generation
+    const gen = Math.max(mom._gen || 1, father._gen || 1) + 1;
+    kitten._gen = gen;
+    if (gen > state.generation) state.generation = gen;
+    recordFirsts(kitten);
+    // Initial affinity: positive toward mom and dad
+    kitten.affinity.set(mom.id, 0.5);
+    kitten.affinity.set(father.id, 0.3);
+    // Mom recognizes her kitten
+    mom.affinity.set(kitten.id, 0.6);
+    father.affinity.set(kitten.id, 0.2);
+    littermates.push(kitten);
+  }
+  // Wire littermate mutual affinity — they grow up bonded
+  for (const a of littermates) {
+    for (const b of littermates) {
+      if (a !== b) a.affinity.set(b.id, 0.4);
+    }
+  }
+  logEvent(`${mom.name} bore ${litterSize} kitten${litterSize>1?'s':''}${F>0.15?' (inbred)':''}`, 'birth');
+  mom.pregnantWith = null;
+  if (momWillDie) {
+    // Mother dies in childbirth shortly after delivery
+    setTimeout(() => triggerDeath(mom, 'childbirth'), 0);
+  }
+}
+
+// ─── DEATH ────────────────────────────────────────────────────
+function triggerDeath(cat, reason) {
+  if (cat.dying) return;
+  cat.dying = true;
+  cat.dyingT = 0;
+  cat.dyingReason = reason;
+  cat.vx = cat.vy = 0;
+  state.totalDied++;
+  if (cat.age > state.longestLife) {
+    state.longestLife = cat.age;
+    state.longestLifeName = cat.name;
+  }
+  // Snapshot for pedigree + end-screen. Keep a compact record.
+  const snapshot = {
+    id: cat.id,
+    name: cat.name,
+    sex: cat.sex,
+    age: cat.age,
+    bornAt: cat.bornAt,
+    diedAt: state.simTime,
+    diedOf: reason,
+    children: cat.children.length,
+    childrenIds: [...cat.children],
+    parents: cat.parents ? [...cat.parents] : null,
+    fightCount: cat.fightCount || 0,
+    inbreedF: cat.inbreedF || 0,
+    bodyScale: cat.bodyScale || 1,
+    phenotype: cat.phenotype,
+    genes: cat.genes,
+    gen: cat._gen || 1,
+    wasFounder: state.founders.includes(cat.id),
+  };
+  // Track all-time records incrementally (so we don't scan a huge array at end)
+  const r = state.records;
+  if (!r.oldest      || snapshot.age        > r.oldest.age)            r.oldest = snapshot;
+  if (!r.mostProlific|| snapshot.children   > r.mostProlific.children) r.mostProlific = snapshot;
+  if (!r.mostFights  || snapshot.fightCount > r.mostFights.fightCount) r.mostFights = snapshot;
+  if (!r.mostInbred  || snapshot.inbreedF   > r.mostInbred.inbreedF)   r.mostInbred = snapshot;
+  if (!r.biggest     || snapshot.bodyScale  > r.biggest.bodyScale)     r.biggest = snapshot;
+  // Push to deceased but cap the array — only recent dead are kept for pedigree lookups.
+  state.deceased.push(snapshot);
+  if (state.deceased.length > 400) state.deceased.shift();
+  logEvent(`${cat.name} died (${reason}, week ${cat.age.toFixed(0)})`, 'death');
+  // Maternal grief: if a kitten dies, mom withdraws socially for a while
+  if (cat.stage === 'kitten' && cat.parents) {
+    const mom = (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
+    if (mom) {
+      mom.social = Math.min(mom.social, 0.15);   // social drive blunted
+      mom.floatTexts.push({text: '…', t: 0, life: 2});
+    }
+  }
+}
+
+function drawDying(ctx, cat) {
+  const t = cat.dyingT;
+  // Phase 1 (0-1s): fade body to skull
+  // Phase 2 (1-2.5s): skull
+  // Phase 3 (2.5-3.5s): skull fades
+  if (t < 1) {
+    const opacity = 1 - t*0.6;
+    ctx.globalAlpha = opacity;
+    drawCat(ctx, cat, cat.x, cat.y - t*4, 1, cat.dir);
+    ctx.globalAlpha = 1;
+  } else if (t < 2.5) {
+    ctx.font = '22px serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(40,30,20, ${Math.min(1, (t-1)*2)})`;
+    ctx.fillText('💀', cat.x, cat.y - 4 - (t-1)*2);
+  } else {
+    const a = clamp(1 - (t-2.5), 0, 1);
+    ctx.globalAlpha = a;
+    ctx.font = '22px serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#2a2418';
+    ctx.fillText('💀', cat.x, cat.y - 7 - (t-2.5)*6);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ─── EVENTS / LOG ─────────────────────────────────────────────
+// Event-type priorities for high-pop filtering. 'major' tier passes always.
+const EVENT_PRIORITY = { 'event': 1, 'birth': 2, 'mate': 2, 'death': 2, 'major': 5 };
+// Substrings that mark colony-level messages that should always pass even at high pop
+const MAJOR_KEYWORDS = ['Year ', 'Spring returns', 'Summer arrives', 'Fall sets in', 'Winter falls',
+  'predator stalks', 'harsh winter', 'plentiful', 'drought', 'epidemic', 'Illness sweeps',
+  'poor harvest', 'abundant fall', 'These cats are becoming'];
+
+function isMajorEvent(text) {
+  for (let i = 0; i < MAJOR_KEYWORDS.length; i++) {
+    if (text.indexOf(MAJOR_KEYWORDS[i]) !== -1) return true;
+  }
+  return false;
+}
+
+function logEvent(text, type='event') {
+  const pop = state.cats.length;
+  // Above 500 cats: suppress everything except colony-level events
+  if (pop > 500 && !isMajorEvent(text)) return;
+  // Mid pop (200-500): drop low-priority events probabilistically
+  if (pop > 200 && pop <= 500 && (EVENT_PRIORITY[type] || 1) < 2 && Math.random() < 0.6) return;
+  state.events.unshift({simTime: state.simTime, text, type});
+  if (state.events.length > 40) state.events.pop();
+  // Time-throttle log render — at most once per 250ms
+  const now = performance.now();
+  if (!state._logRenderQueued && (now - (state._lastLogRender || 0)) > 250) {
+    state._logRenderQueued = true;
+    requestAnimationFrame(() => {
+      state._logRenderQueued = false;
+      state._lastLogRender = performance.now();
+      renderLog();
+    });
+  }
+}
+
+function renderLog() {
+  const wrap = document.getElementById('log');
+  wrap.innerHTML = '';
+  const recent = state.events.slice(0, 4);
+  for (const e of recent) {
+    const div = document.createElement('div');
+    div.className = `log-entry event-${e.type}`;
+    div.textContent = e.text;
+    wrap.appendChild(div);
+  }
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────
+function tick(time) {
+  if (state.phase === 'running') {
+    if (!state.lastTime) state.lastTime = time;
+    const realDt = Math.min((time - state.lastTime) / 1000, 1/15);
+    state.lastTime = time;
+    const dt = realDt / SIM_DAY_REAL_SEC * state.speed;
+    state.simTime += dt;
+    // Season + year tracking
+    const newSeason = deriveSeason(state.simTime);
+    const newYear = deriveYear(state.simTime);
+    if (newSeason !== state.season) {
+      state.season = newSeason;
+      const seasonMsg = newSeason === 'spring' ? 'Spring returns. Breeding season begins.' :
+                        newSeason === 'summer' ? 'Summer arrives.' :
+                        newSeason === 'fall' ? 'Fall sets in. Breeding season ends.' :
+                        'Winter falls over the colony.';
+      logEvent(seasonMsg, 'event');
+      // Roll for seasonal environmental event
+      rollSeasonalEvent(newSeason);
+    }
+    if (newYear !== state.year) {
+      state.year = newYear;
+      logEvent(`Year ${newYear} begins.`, 'event');
+      // Weather drifts year-to-year — emergent climate variation
+      driftWeather();
+      // Live gene drift narration — report meaningful shifts from founder genes
+      if (state.founderGenes && state.year > 1) {
+        const adults = state.cats.filter(c => !c.dying && c.stage !== 'kitten');
+        if (adults.length >= 4) {
+          const phrases = {
+            boldness:    ['bolder', 'more timid'],
+            sociability: ['more social', 'more aloof'],
+            playfulness: ['more playful', 'more serious'],
+            aggression:  ['more aggressive', 'gentler'],
+            energy:      ['more energetic', 'mellower'],
+            appetite:    ['hungrier eaters', 'lighter eaters'],
+          };
+          const shifts = [];
+          for (const t of Object.keys(phrases)) {
+            const curMean = adults.reduce((s,c) => s + c.genes[t], 0) / adults.length;
+            const founderMean = state.founderGenes[t];
+            const delta = curMean - founderMean;
+            const lastDelta = state.lastDriftAnnouncement[t] || 0;
+            // Only announce if drift exceeds 0.12 AND has changed substantially since last announcement
+            if (Math.abs(delta) > 0.12 && Math.abs(delta - lastDelta) > 0.06) {
+              shifts.push({trait: t, delta, phrase: phrases[t][delta > 0 ? 0 : 1]});
+              state.lastDriftAnnouncement[t] = delta;
+            }
+          }
+          // Body size drift
+          const curBody = adults.reduce((s,c) => s + (c.bodyScale||1), 0) / adults.length;
+          const bodyDelta = curBody - state.founderGenes.bodyScale;
+          const lastBodyDelta = state.lastDriftAnnouncement.bodyScale || 0;
+          if (Math.abs(bodyDelta) > 0.08 && Math.abs(bodyDelta - lastBodyDelta) > 0.04) {
+            shifts.push({trait: 'bodyScale', delta: bodyDelta, phrase: bodyDelta > 0 ? 'larger' : 'smaller'});
+            state.lastDriftAnnouncement.bodyScale = bodyDelta;
+          }
+          // Announce the biggest shift this year
+          if (shifts.length) {
+            shifts.sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
+            const top = shifts[0];
+            logEvent(`These cats are becoming ${top.phrase} than their forebears.`, 'event');
+          }
+        }
+      }
+    }
+
+    // Auto-spawn food at feeding spots — burst-refills to target so late game is sustainable
+    if (state.simTime - state.lastAutoFood > FOOD_SPAWN_INTERVAL) {
+      const livingPop = state.cats.filter(c => !c.dying).length;
+      // Add additional feeding spots as the colony grows so cats don't all pile on the same few
+      const desiredSpots = livingPop >= 35 ? 6 : livingPop >= 22 ? 5 : livingPop >= 12 ? 4 : 3;
+      while (state.feedSpots.length < desiredSpots) {
+        const ang = Math.random() * Math.PI * 2;
+        const radius = Math.min(arenaW, arenaH) * (0.18 + Math.random()*0.22);
+        state.feedSpots.push({
+          x: clamp(arenaW/2 + Math.cos(ang)*radius, 60, arenaW-60),
+          y: clamp(arenaH/2 + Math.sin(ang)*radius, 130, arenaH-60),
+        });
+      }
+      // Environmental carrying capacity — food production has hard limits.
+      // Lower cap = smaller colony = each death matters = visible evolution.
+      // colonyScale (player setting) shifts the whole equilibrium: smaller = faster evolution.
+      const colonyScale = state.colonyScale || 1;
+      const areaCap = Math.max(15, Math.floor((arenaW * arenaH) / 20000 * colonyScale));
+      let envMult = 1;
+      if (state.season === 'winter') envMult *= 0.5;
+      else if (state.season === 'fall') envMult *= 0.8;
+      else if (state.season === 'summer') envMult *= 1.1;
+      if (state.activeEvent === 'plentiful') envMult *= 1.6;
+      else if (state.activeEvent === 'drought') envMult *= 0.35;
+      else if (state.activeEvent === 'harshWinter') envMult *= 0.6;
+      const envCap = Math.max(6, Math.floor(areaCap * envMult));
+      // Target = whichever is LOWER: per-cat demand OR environmental ceiling.
+      // When pop exceeds env capacity, food gets scarce — starvation deaths cull naturally.
+      const demand = Math.ceil(livingPop * FOOD_PER_CAT);
+      const targetFood = Math.max(FOOD_TARGET_MIN, Math.min(demand, envCap));
+      const shortfall = targetFood - state.food.length;
+      if (shortfall > 0) {
+        const dynamicBurst = Math.max(FOOD_BURST_MAX, Math.ceil(livingPop / 25));
+        const toSpawn = Math.min(shortfall, dynamicBurst);
+        for (let i = 0; i < toSpawn; i++) {
+          if (Math.random() < FOOD_RANDOM_CHANCE) {
+            dropFood(rand(70, arenaW-70), rand(150, arenaH-70));
+          } else {
+            const spot = state.feedSpots[Math.floor(Math.random()*state.feedSpots.length)];
+            const ang = Math.random() * Math.PI * 2;
+            const r = 12 + Math.random() * FOOD_SPOT_JITTER;
+            dropFood(
+              clamp(spot.x + Math.cos(ang)*r, 50, arenaW-50),
+              clamp(spot.y + Math.sin(ang)*r, 130, arenaH-50)
+            );
+          }
+        }
+      }
+      state.lastAutoFood = state.simTime;
+    }
+
+    // Remove expired food
+    state.food = state.food.filter(f => state.simTime - f.bornAt < FOOD_LIFETIME && f.amount > 0.01);
+
+    // Rebuild spatial index once before any neighbor queries this tick
+    rebuildSpatialIndex();
+
+    // Update cats
+    for (const cat of state.cats) updateCat(cat, dt);
+    // Remove dead-faded
+    state.cats = state.cats.filter(c => !c._remove);
+
+    // Sample history
+    if (Math.floor(state.simTime/2) > state.history.length) {
+      state.history.push({day: state.simTime, pop: state.cats.length, born: state.totalBorn, died: state.totalDied});
+      state.diversityHistory.push(computeDiversity());
+      // Gene drift sample — mean of each behavioral gene across living adults
+      const adults = state.cats.filter(c => !c.dying && c.stage !== 'kitten');
+      if (adults.length > 0) {
+        const traits = ['boldness','sociability','playfulness','aggression','energy','appetite'];
+        for (const t of traits) {
+          const mean = adults.reduce((s,c) => s + c.genes[t], 0) / adults.length;
+          state.geneHistory[t].push(mean);
+        }
+        const sizeMean = adults.reduce((s,c) => s + (c.bodyScale||1), 0) / adults.length;
+        state.geneHistory.bodyScale.push(sizeMean);
+      } else {
+        // Carry forward last value (or push 0.5)
+        for (const t of ['boldness','sociability','playfulness','aggression','energy','appetite']) {
+          const last = state.geneHistory[t];
+          last.push(last.length ? last[last.length-1] : 0.5);
+        }
+        const last = state.geneHistory.bodyScale;
+        last.push(last.length ? last[last.length-1] : 1);
+      }
+      // Update visible evo tracker if open
+      const tr = document.getElementById('evoTracker');
+      if (tr && !tr.classList.contains('hidden')) renderEvoTracker();
+    }
+
+    // Check end — sim ends when ≤1 cat alive (a lone cat can't breed)
+    const livingCount = state.cats.filter(c => !c.dying).length;
+    if (livingCount <= 1) {
+      // wait for dying animations to finish, then a brief grace for the lone cat
+      state._endTimer = (state._endTimer || 0) + dt * SIM_DAY_REAL_SEC / state.speed; // real seconds
+      const allDead = livingCount === 0 && state.cats.length === 0;
+      const loneSurvivor = livingCount === 1 && state.cats.length === 1;
+      // End immediately if all dying-fades are done, OR after 3 real seconds with a lone survivor
+      if (allDead) endSimulation();
+      else if (loneSurvivor && state._endTimer > 3) {
+        // mark the survivor as dying ('alone') so its fade plays into the end screen
+        const lone = state.cats.find(c => !c.dying);
+        if (lone) {
+          logEvent(`${lone.name} is the last cat. The line ends.`, 'death');
+          triggerDeath(lone, 'alone');
+        }
+      }
+    } else if (state._endTimer) {
+      state._endTimer = 0;
+    }
+
+    // UI updates
+    document.getElementById('dayCount').textContent = Math.floor(state.simTime);
+    document.getElementById('popCount').textContent = state.cats.filter(c=>!c.dying).length;
+    // Week sub: "spring · Y4"
+    const weekSub = document.getElementById('weekSub');
+    weekSub.textContent = `${state.season} · Y${state.year}`;
+    weekSub.className = 'stat-sub ' + state.season;
+    // Cat sub: "Gen 3"
+    document.getElementById('catSub').textContent = 'Gen ' + state.generation;
+    // Event banner
+    const banner = document.getElementById('eventBanner');
+    if (state.activeEvent) {
+      banner.textContent = state.activeEventMessage;
+      banner.className = state.activeEvent;
+    } else {
+      banner.className = 'hidden';
+    }
+  } else {
+    state.lastTime = time;
+  }
+
+  // Render
+  if (state.phase !== 'setup') render();
+
+  requestAnimationFrame(tick);
+}
+
+function render() {
+  const ctx = canvas.getContext('2d');
+  drawArena(ctx);
+  // Food first
+  for (const f of state.food) drawFood(ctx, f);
+  // Cats sorted by y for fake depth
+  const sorted = [...state.cats].sort((a,b)=>a.y-b.y);
+  for (const cat of sorted) {
+    if (cat.dying) drawDying(ctx, cat);
+    else drawCat(ctx, cat, cat.x, cat.y, 1, cat.dir);
+  }
+}
+
+// ─── DIVERSITY ────────────────────────────────────────────────
+function computeDiversity() {
+  const live = state.cats.filter(c=>!c.dying);
+  if (live.length === 0) return 0;
+  // Combine: visible-gene heterozygosity + behavioral gene spread (std dev).
+  // The behavioral component matters because that's what the player watches evolve.
+  let hetSum = 0;
+  for (const c of live) {
+    let het = 0;
+    const n = 6;
+    for (const k of ['B','D','A','S','L','W']) {
+      if (c.genes[k][0] !== c.genes[k][1]) het++;
+    }
+    hetSum += het / n;
+  }
+  const visibleHet = hetSum / live.length;
+  // Behavioral spread: mean of per-trait standard deviations (0 = clones, higher = diverse)
+  const traits = ['boldness','sociability','playfulness','aggression','energy','appetite','size'];
+  let spreadSum = 0;
+  for (const t of traits) {
+    let mean = 0;
+    for (const c of live) mean += c.genes[t];
+    mean /= live.length;
+    let varSum = 0;
+    for (const c of live) { const d = c.genes[t] - mean; varSum += d*d; }
+    spreadSum += Math.sqrt(varSum / live.length);
+  }
+  const behavioralSpread = spreadSum / traits.length;   // ~0 to ~0.3
+  // Blend the two into a single 0-1 diversity index (behavioral scaled to comparable range)
+  return clamp(visibleHet * 0.5 + (behavioralSpread / 0.3) * 0.5, 0, 1);
+}
+
+// ─── INPUT ────────────────────────────────────────────────────
+function onArenaTap(e) {
+  if (state.phase !== 'running') return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.changedTouches ? e.changedTouches[0] : e;
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  // Find tapped cat
+  let tappedCat = null, bestD = 30;
+  for (const c of state.cats) {
+    if (c.dying) continue;
+    const d = Math.hypot(c.x-x, c.y-y);
+    if (d < bestD) { bestD = d; tappedCat = c; }
+  }
+  if (tappedCat) {
+    openInspector(tappedCat);
+  } else {
+    // Drop food
+    dropFood(x, y);
+  }
+}
+
+// ─── INSPECTOR ────────────────────────────────────────────────
+function openInspector(cat) {
+  state.selectedCatId = cat.id;
+  const panel = document.getElementById('inspectorPanel');
+  panel.innerHTML = '';
+  const handle = document.createElement('div');
+  handle.className = 'panel-handle';
+  panel.appendChild(handle);
+
+  // Head
+  const head = document.createElement('div');
+  head.className = 'inspector-head';
+  const portrait = document.createElement('div');
+  portrait.className = 'inspector-portrait';
+  const pc = document.createElement('canvas');
+  pc.width = 80; pc.height = 80;
+  portrait.appendChild(pc);
+  setTimeout(()=>{
+    const pctx = pc.getContext('2d');
+    pctx.clearRect(0,0,80,80);
+    drawCat(pctx, cat, 40, 45, 1.6, 0);
+  },0);
+  head.appendChild(portrait);
+  const meta = document.createElement('div');
+  meta.className = 'inspector-meta';
+  const nameI = document.createElement('input');
+  nameI.className = 'inspector-name';
+  nameI.value = cat.name;
+  nameI.maxLength = 16;
+  nameI.addEventListener('input', () => { cat.name = nameI.value || cat.name; });
+  meta.appendChild(nameI);
+  const sub = document.createElement('div');
+  sub.className = 'inspector-subline';
+  let sublineExtra = '';
+  if (cat.sex === 'F' && cat.stage !== 'kitten' && !cat.pregnantWith) {
+    sublineExtra = cat.inEstrus ? ' · in heat' : ' · not in heat';
+  }
+  const gen = cat._gen || 1;
+  const sizePct = Math.round((cat.bodyScale || 1) * 100);
+  const sizeWord = cat.bodyScale < 0.7 ? 'small' : cat.bodyScale > 1.3 ? 'large' : 'average';
+  sub.textContent = `${cat.sex==='M'?'♂':'♀'} · G${gen} · ${cat.stage} · ${cat.age.toFixed(0)}w · ${sizeWord} (${sizePct}%) · ${cat.phenotype.description}${sublineExtra}`;
+  meta.appendChild(sub);
+  // Special trait badges
+  if (cat.rareTraits && cat.rareTraits.length) {
+    const badges = document.createElement('div');
+    badges.className = 'rare-badges';
+    for (const t of cat.rareTraits) {
+      const span = document.createElement('span');
+      span.className = 'rare-badge';
+      span.textContent = t;
+      badges.appendChild(span);
+    }
+    meta.appendChild(badges);
+  }
+  head.appendChild(meta);
+  panel.appendChild(head);
+
+  // Needs
+  panel.appendChild(sectionTitle('Needs'));
+  const needs = document.createElement('div');
+  needs.className = 'needs-bars';
+  needs.appendChild(needBar('Hunger', cat.hunger));
+  needs.appendChild(needBar('Energy', cat.energy));
+  needs.appendChild(needBar('Social', cat.social));
+  needs.appendChild(needBar('Condition', cat.condition !== undefined ? cat.condition : 1));
+  panel.appendChild(needs);
+
+  // Genes
+  panel.appendChild(sectionTitle('Visible genes'));
+  const vg = document.createElement('div');
+  vg.className = 'gene-grid';
+  const visibles = [
+    ['B (black)', cat.genes.B.join('')],
+    ['D (dense)', cat.genes.D.join('')],
+    ['A (agouti)', cat.genes.A.join('')],
+    ['T (tabby)', cat.genes.T.join('/')],
+    ['S (white)', cat.genes.S.join('')],
+    ['L (hair)', cat.genes.L.join('')],
+    ['W (white)', cat.genes.W.join('')],
+    ['O (orange)', cat.genes.O.join('') + (cat.sex==='M'?'/Y':'')],
+  ];
+  for (const [k,v] of visibles) {
+    const row = document.createElement('div');
+    row.className = 'gene-row';
+    row.innerHTML = `<span class="gene-name">${k}</span><span class="gene-val">${v}</span>`;
+    vg.appendChild(row);
+  }
+  panel.appendChild(vg);
+
+  // Behavior
+  panel.appendChild(sectionTitle('Disposition'));
+  const bg = document.createElement('div');
+  bg.className = 'needs-bars';
+  bg.appendChild(needBar('Bold', cat.genes.boldness, true));
+  bg.appendChild(needBar('Social', cat.genes.sociability, true));
+  bg.appendChild(needBar('Playful', cat.genes.playfulness, true));
+  bg.appendChild(needBar('Aggro', cat.genes.aggression, true));
+  bg.appendChild(needBar('Energy', cat.genes.energy, true));
+  bg.appendChild(needBar('Appetite', cat.genes.appetite, true));
+  if (cat.genes.size !== undefined) bg.appendChild(needBar('Size', cat.genes.size, true));
+  panel.appendChild(bg);
+
+  // Coat tint — explains what trait color (if any) shifts this cat's coat in the arena
+  panel.appendChild(sectionTitle('Coat tint'));
+  const auraInfo = computeAuraInfo(cat);
+  const auraDiv = document.createElement('div');
+  auraDiv.className = 'aura-info';
+  if (auraInfo.label) {
+    auraDiv.innerHTML = `<span class="aura-swatch" style="background:${auraInfo.color}"></span>
+      <div class="aura-text"><div class="aura-label">${auraInfo.label}</div>
+      <div class="aura-desc">${auraInfo.desc}</div></div>`;
+  } else {
+    auraDiv.innerHTML = `<div class="aura-text"><div class="aura-desc" style="font-style:italic;color:var(--ink-faint)">No notable tint — traits near population baseline.</div></div>`;
+  }
+  panel.appendChild(auraDiv);
+
+  // Relations
+  panel.appendChild(sectionTitle('Family'));
+  panel.appendChild(buildPedigree(cat));
+  if (cat.pregnantWith) {
+    const preg = document.createElement('div');
+    preg.className = 'pedigree-note';
+    preg.textContent = `Pregnant · ${cat.pregnantWith.daysLeft.toFixed(0)} weeks left`;
+    panel.appendChild(preg);
+  }
+
+  if (cat.inbreedF > 0.02) {
+    const coef = document.createElement('div');
+    coef.className = 'coefficient-display';
+    coef.innerHTML = `Inbreeding coefficient <strong>F = ${cat.inbreedF.toFixed(3)}</strong> — affects lifespan and kitten viability`;
+    panel.appendChild(coef);
+  }
+
+  document.getElementById('inspector').classList.add('open');
+}
+
+// Helper: find a cat by id (alive or deceased)
+function findCatById(id) {
+  if (id == null) return null;
+  const alive = catById.get(id);
+  if (alive) return { record: alive, alive: true };
+  const dead = state.deceased.find(d => d.id === id);
+  if (dead) return { record: dead, alive: false };
+  return null;
+}
+
+// Build a small portrait card for one ancestor/descendant in the pedigree
+function pedigreeCard(catId, role) {
+  const found = findCatById(catId);
+  const card = document.createElement('div');
+  card.className = 'pedigree-card' + (found ? '' : ' missing') + (found && !found.alive ? ' deceased' : '');
+  if (!found) {
+    card.innerHTML = `<div class="ped-portrait"></div><div class="ped-name">unknown</div><div class="ped-role">${role}</div>`;
+    return card;
+  }
+  const c = found.record;
+  // Tiny canvas portrait
+  const portraitWrap = document.createElement('div');
+  portraitWrap.className = 'ped-portrait';
+  const pc = document.createElement('canvas');
+  pc.width = 48; pc.height = 48;
+  portraitWrap.appendChild(pc);
+  card.appendChild(portraitWrap);
+  // Render the cat at small scale
+  setTimeout(() => {
+    const ctx = pc.getContext('2d');
+    ctx.clearRect(0,0,48,48);
+    // For deceased records we don't have x/y/state — use an adult template
+    const renderCat = found.alive ? c : {
+      ...c, x: 24, y: 24, vx: 0, vy: 0, dir: 0, state: 'wander',
+      stage: c.age < KITTEN_DAYS ? 'kitten' : c.age < ADULT_END ? 'adult' : 'senior',
+      floatTexts: [], bornFlash: 0, fightGlow: 0, sick: false,
+      condition: 1, hunger: 0.8, energy: 0.8,
+      pregnantWith: null,
+    };
+    drawCat(ctx, renderCat, 24, 28, 1, 0);
+  }, 0);
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'ped-name';
+  nameDiv.textContent = c.name;
+  card.appendChild(nameDiv);
+  const roleDiv = document.createElement('div');
+  roleDiv.className = 'ped-role';
+  roleDiv.textContent = role + (found.alive ? '' : ' †');
+  card.appendChild(roleDiv);
+  // Make alive cats tappable to inspect them
+  if (found.alive) {
+    card.classList.add('tappable');
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openInspector(c);
+    });
+  }
+  return card;
+}
+
+function buildPedigree(cat) {
+  const wrap = document.createElement('div');
+  wrap.className = 'pedigree';
+
+  // Parents row
+  if (cat.parents) {
+    const parentsRow = document.createElement('div');
+    parentsRow.className = 'pedigree-row';
+    parentsRow.appendChild(pedigreeCard(cat.parents[0], 'mother'));
+    parentsRow.appendChild(pedigreeCard(cat.parents[1], 'father'));
+    wrap.appendChild(parentsRow);
+  } else {
+    const founder = document.createElement('div');
+    founder.className = 'pedigree-note';
+    founder.textContent = 'Founder of the colony.';
+    wrap.appendChild(founder);
+  }
+
+  // Children row (always show, even if empty, with a hint)
+  if (cat.children && cat.children.length > 0) {
+    const kidsLabel = document.createElement('div');
+    kidsLabel.className = 'pedigree-divider';
+    kidsLabel.textContent = `${cat.children.length} kitten${cat.children.length!==1?'s':''}`;
+    wrap.appendChild(kidsLabel);
+    const kidsRow = document.createElement('div');
+    kidsRow.className = 'pedigree-row pedigree-kids';
+    for (const kid of cat.children) {
+      kidsRow.appendChild(pedigreeCard(kid, ''));
+    }
+    wrap.appendChild(kidsRow);
+  } else if (cat.stage !== 'kitten' && cat.stage !== 'juvenile') {
+    const none = document.createElement('div');
+    none.className = 'pedigree-note';
+    none.textContent = 'No kittens.';
+    wrap.appendChild(none);
+  }
+
+  return wrap;
+}
+
+function sectionTitle(txt) {
+  const d = document.createElement('div');
+  d.className = 'section-title';
+  d.textContent = txt;
+  return d;
+}
+
+// Compute what aura (if any) this cat displays in the arena.
+// Keep the logic in sync with the rendering in drawCat.
+function computeAuraInfo(cat) {
+  if (cat.sick) {
+    return { label: 'Sickly', color: 'rgba(140,170,90,0.6)',
+      desc: 'A pale greenish halo surrounds this cat. They are ill.' };
+  }
+  if (cat.fightGlow > 0.5) {
+    return { label: 'Wounded', color: 'rgba(200,60,40,0.6)',
+      desc: 'A red flash from recent fighting. Fades in moments.' };
+  }
+  if (cat.stage === 'kitten') return {};
+  const g = cat.genes;
+  const traits = [
+    { val: g.aggression - 0.5,  label: 'Fierce',     desc: 'Coat tinted warm red. Highly aggressive — wins fights and defends against predators.', color: 'rgba(200,70,40,0.7)' },
+    { val: g.boldness - 0.5,    label: 'Bold',       desc: 'Coat tinted orange. Bold disposition — better forager, attracts mates.',                 color: 'rgba(205,130,50,0.7)' },
+    { val: g.energy - 0.5,      label: 'Vigorous',   desc: 'Coat tinted yellow. High energy — survives cold, plays often.',                          color: 'rgba(220,195,70,0.7)' },
+    { val: g.sociability - 0.5, label: 'Sociable',   desc: 'Coat tinted green. Highly social — sleeps in piles, but catches illness faster.',       color: 'rgba(110,175,110,0.7)' },
+    { val: g.playfulness - 0.5, label: 'Playful',    desc: 'Coat tinted violet. Loves to play — attracts mates, but burns energy.',                  color: 'rgba(175,125,200,0.7)' },
+  ];
+  let strongest = null, strongestAbs = 0.12;
+  for (const t of traits) {
+    if (Math.abs(t.val) > strongestAbs) { strongestAbs = Math.abs(t.val); strongest = t; }
+  }
+  if (!strongest) return {};
+  if (strongest.val > 0) {
+    return { label: strongest.label, color: strongest.color, desc: strongest.desc };
+  } else {
+    const negLabel = ({
+      'Fierce':   'Gentle',
+      'Bold':     'Timid',
+      'Vigorous': 'Mellow',
+      'Sociable': 'Aloof',
+      'Playful':  'Reserved',
+    })[strongest.label] || 'Subdued';
+    const negDesc = ({
+      'Fierce':   'Coat tinted cool blue. Very low aggression — peaceful, avoids fights.',
+      'Bold':     'Coat tinted cool blue. Timid — avoids danger but forages less in lean times.',
+      'Vigorous': 'Coat tinted cool blue. Low energy — efficient in droughts, vulnerable to cold.',
+      'Sociable': 'Coat tinted cool blue. Aloof — avoids crowds, safer in epidemics.',
+      'Playful':  'Coat tinted cool blue. Reserved — conserves energy, less attractive to mates.',
+    })[strongest.label] || 'Coat tinted cool blue.';
+    return { label: negLabel, color: 'rgba(85,125,165,0.7)', desc: negDesc };
+  }
+}
+
+// Render the floating evolution tracker panel
+function renderEvoTracker() {
+  const rows = document.getElementById('evoRows');
+  if (!rows || !state.founderGenes) return;
+  const adults = state.cats.filter(c => !c.dying && c.stage !== 'kitten');
+  if (adults.length === 0) { rows.innerHTML = '<div class="evo-row"><span style="font-size:10px;color:var(--ink-faint);font-style:italic">No adults yet</span></div>'; return; }
+  const traits = [
+    ['boldness', 'bold'],
+    ['sociability', 'social'],
+    ['playfulness', 'play'],
+    ['aggression', 'aggro'],
+    ['energy', 'energy'],
+    ['appetite', 'appet.'],
+  ];
+  let html = '';
+  for (const [k, label] of traits) {
+    const mean = adults.reduce((s,c) => s + c.genes[k], 0) / adults.length;
+    const founder = state.founderGenes[k];
+    const delta = mean - founder;
+    // -0.4 ... +0.4 maps to bar range
+    const dispMax = 0.35;
+    const w = clamp(Math.abs(delta) / dispMax, 0, 1) * 50;
+    const cls = delta < 0 ? 'neg' : '';
+    const side = delta < 0 ? `right:50%;` : `left:50%;`;
+    const signStr = (delta>=0?'+':'') + (delta*100).toFixed(0);
+    html += `<div class="evo-row"><span class="evo-label">${label}</span>
+      <div class="evo-bar-wrap"><div class="evo-zero"></div>
+      <div class="evo-fill ${cls}" style="${side}width:${w}%;"></div></div>
+      <span class="evo-val">${signStr}</span></div>`;
+  }
+  // Body size
+  const sizeMean = adults.reduce((s,c) => s + (c.bodyScale||1), 0) / adults.length;
+  const sizeDelta = sizeMean - state.founderGenes.bodyScale;
+  const sw = clamp(Math.abs(sizeDelta) / 0.3, 0, 1) * 50;
+  const scls = sizeDelta < 0 ? 'neg' : '';
+  const sside = sizeDelta < 0 ? `right:50%;` : `left:50%;`;
+  html += `<div class="evo-row"><span class="evo-label">size</span>
+    <div class="evo-bar-wrap"><div class="evo-zero"></div>
+    <div class="evo-fill ${scls}" style="${sside}width:${sw}%;"></div></div>
+    <span class="evo-val">${(sizeDelta>=0?'+':'')}${(sizeDelta*100).toFixed(0)}</span></div>`;
+  rows.innerHTML = html;
+}
+function needBar(label, val, neutral=false) {
+  const d = document.createElement('div');
+  d.className = 'need-bar';
+  const fillClass = neutral ? '' : (val < 0.2 ? 'danger' : val < 0.4 ? 'warn' : '');
+  d.innerHTML = `<span class="label">${label}</span>
+    <div class="track"><div class="fill ${fillClass}" style="width:${Math.round(val*100)}%"></div></div>
+    <span class="val">${Math.round(val*100)}</span>`;
+  return d;
+}
+function relateItem(label, val) {
+  const d = document.createElement('div');
+  d.className = 'relate-item';
+  d.innerHTML = `<span class="label">${label}</span><span class="vals">${val}</span>`;
+  return d;
+}
+
+function closeInspector() {
+  document.getElementById('inspector').classList.remove('open');
+  state.selectedCatId = null;
+}
+document.getElementById('inspector').addEventListener('click', (e) => {
+  if (e.target.id === 'inspector') closeInspector();
+});
+
+// ─── END SCREEN ───────────────────────────────────────────────
+function determineEndCause() {
+  if (state.endedByUser) return 'You ended the run.';
+  // Look at the most recent deaths to guess the cause
+  const recent = state.deceased.slice(-Math.min(6, state.deceased.length));
+  if (recent.length === 0) return 'The colony ended.';
+  const causes = {};
+  for (const d of recent) causes[d.diedOf] = (causes[d.diedOf]||0) + 1;
+  const top = Object.entries(causes).sort((a,b)=>b[1]-a[1])[0];
+  const cause = top[0];
+  if (cause === 'old age') return 'The last cats died of old age.';
+  if (cause === 'starvation') return 'The colony succumbed to starvation.';
+  if (cause === 'orphaned') return 'Kittens were left without mothers.';
+  if (cause === 'alone') return 'The final survivor outlived the line.';
+  return `The colony ended (${cause}).`;
+}
+
+function endSimulation() {
+  state.phase = 'ended';
+  state.endCause = determineEndCause();
+
+  // Gather the all-time roster
+  const peakPop = state.history.length ? Math.max(...state.history.map(h=>h.pop), 0) : 0;
+  const lastDiv = state.diversityHistory[state.diversityHistory.length-1] ?? 0;
+  const initDiv = state.diversityHistory[0] ?? 0;
+
+  // Notables — read from incrementally-tracked all-time records (not a full scan)
+  const r = state.records;
+  const mostProlific = r.mostProlific;
+  const oldest = r.oldest;
+  const mostFights = r.mostFights;
+  const mostInbred = r.mostInbred;
+  const biggest = r.biggest;
+
+  // Build notable rows
+  const notables = [];
+  if (oldest) notables.push({ label: 'Oldest', name: oldest.name, detail: `${oldest.age.toFixed(0)} weeks · gen ${oldest.gen}` });
+  if (mostProlific && mostProlific.children > 0) notables.push({ label: 'Most prolific', name: mostProlific.name, detail: `${mostProlific.children} kitten${mostProlific.children!==1?'s':''}` });
+  if (mostFights && mostFights.fightCount > 0) notables.push({ label: 'Most fights', name: mostFights.name, detail: `${mostFights.fightCount} scrap${mostFights.fightCount!==1?'s':''}` });
+  if (mostInbred && mostInbred.inbreedF > 0.05) notables.push({ label: 'Most inbred', name: mostInbred.name, detail: `F = ${mostInbred.inbreedF.toFixed(3)}` });
+  if (biggest) notables.push({ label: 'Largest', name: biggest.name, detail: `${(biggest.bodyScale*100).toFixed(0)}% scale` });
+
+  // Gene drift summary — compare first sample to last
+  const traitLabels = {
+    boldness:'Boldness', sociability:'Sociability', playfulness:'Playfulness',
+    aggression:'Aggression', energy:'Energy', appetite:'Appetite'
+  };
+  const geneDrift = [];
+  for (const [key, label] of Object.entries(traitLabels)) {
+    const arr = state.geneHistory[key];
+    if (arr.length < 2) continue;
+    const start = arr[0];
+    const end = arr[arr.length - 1];
+    const delta = end - start;
+    let dir = 'flat', arrow = '→';
+    if (delta > 0.04) { dir = 'up'; arrow = '↑'; }
+    else if (delta < -0.04) { dir = 'down'; arrow = '↓'; }
+    geneDrift.push({ label, start: (start*100).toFixed(0), end: (end*100).toFixed(0), delta, dir, arrow });
+  }
+
+  // First appearances
+  const firstsRows = [];
+  const f = state.firsts;
+  const phenotypeLabels = {
+    'calico': 'First calico', 'tortie': 'First tortie',
+    'white': 'First all-white', 'black': 'First black',
+    'red': 'First red', 'cream': 'First cream',
+    'blue': 'First blue', 'lilac': 'First lilac', 'chocolate': 'First chocolate',
+  };
+  for (const [key, label] of Object.entries(phenotypeLabels)) {
+    if (f[key]) firstsRows.push({ label, name: f[key].name, detail: `week ${f[key].day}` });
+  }
+  if (f._longhair) firstsRows.push({ label: 'First longhair', name: f._longhair.name, detail: `week ${f._longhair.day}` });
+  if (f._classic) firstsRows.push({ label: 'First classic tabby', name: f._classic.name, detail: `week ${f._classic.day}` });
+  if (f._spotted) firstsRows.push({ label: 'First spotted tabby', name: f._spotted.name, detail: `week ${f._spotted.day}` });
+
+  const c = document.getElementById('endContent');
+  c.innerHTML = `
+    <div class="end-title">The colony has ended.</div>
+    <div class="end-subtitle">${Math.floor(state.simTime)} weeks observed</div>
+    <div class="end-cause">${state.endCause}</div>
+
+    <div class="stats-grid">
+      <div class="stat-cell"><div class="label">Generations</div><div class="val">${state.generation}</div></div>
+      <div class="stat-cell"><div class="label">Years observed</div><div class="val">${state.year}</div></div>
+      <div class="stat-cell"><div class="label">Cats born</div><div class="val">${state.totalBorn}</div></div>
+      <div class="stat-cell"><div class="label">Peak pop.</div><div class="val">${peakPop}</div></div>
+      <div class="stat-cell"><div class="label">Illnesses</div><div class="val">${state.diseaseOutbreaks}</div></div>
+      <div class="stat-cell"><div class="label">Stillborn</div><div class="val">${state.stillborn}</div></div>
+      <div class="stat-cell"><div class="label">Longest life</div><div class="val">${state.longestLife.toFixed(0)}<span style="font-size:14px;color:var(--ink-faint)"> w</span></div><div class="sub">${state.longestLifeName||'—'}</div></div>
+      <div class="stat-cell"><div class="label">Diversity drift</div><div class="val">${(initDiv*100).toFixed(0)}<span style="font-size:14px;color:var(--ink-faint)">→${(lastDiv*100).toFixed(0)}%</span></div></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Population over time</div>
+      <canvas id="popChart"></canvas>
+      ${state.eventTimeline.length > 0 ? '<div class="chart-hint">Tap a marker to see what happened.</div>' : ''}
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Genetic diversity (heterozygosity)</div>
+      <canvas id="divChart"></canvas>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Behavioral gene drift</div>
+      <canvas id="geneChart"></canvas>
+    </div>
+
+    ${geneDrift ? `
+      <div class="section-title">How the line drifted</div>
+      <div class="notable-list">
+        ${geneDrift.map(d => `
+          <div class="notable">
+            <div><div class="who">${d.label}</div><div class="what">founder avg ${d.start}</div></div>
+            <div class="what" style="color:${d.dir === 'up' ? 'var(--moss)' : d.dir === 'down' ? 'var(--terracotta)' : 'var(--ink-faint)'}">${d.arrow} ${d.end}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${notables.length ? `
+      <div class="section-title" style="margin-top:18px;">Notable cats</div>
+      <div class="notable-list">
+        ${notables.map(n => `
+          <div class="notable">
+            <div><div class="who">${n.name}</div><div class="what">${n.label}</div></div>
+            <div class="what">${n.detail}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${firstsRows.length ? `
+      <div class="section-title">First appearances</div>
+      <div class="notable-list">
+        ${firstsRows.map(n => `
+          <div class="notable">
+            <div><div class="who">${n.name}</div><div class="what">${n.label}</div></div>
+            <div class="what">${n.detail}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <button class="restart-btn" onclick="restart()">Start a new colony</button>
+  `;
+  // Hide game UI so topbar/inspector don't compete with end screen
+  document.getElementById('game').classList.remove('active');
+  document.getElementById('inspector').classList.remove('open');
+  document.getElementById('confirmModal').classList.add('hidden');
+  document.getElementById('end').classList.add('active');
+  // Reset scroll on the end container in case it was scrolled before
+  setTimeout(() => { document.getElementById('end').scrollTop = 0; }, 0);
+  // Render charts after layout settles (two rAFs to be safe)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    drawLineChart('popChart', state.history.map(h=>h.pop), '#5b7048', { events: state.eventTimeline });
+    drawLineChart('divChart', state.diversityHistory, '#b3603e', { events: state.eventTimeline });
+    drawGeneDriftChart('geneChart');
+  }));
+}
+
+function drawLineChart(canvasId, data, color, opts = {}) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const dpr = window.devicePixelRatio || 1;
+  let W = Math.floor(c.getBoundingClientRect().width);
+  if (W < 50 && c.parentElement) {
+    const parentRect = c.parentElement.getBoundingClientRect();
+    W = Math.max(240, Math.floor(parentRect.width) - 28);
+  }
+  if (W < 50) W = 320;
+  const H = 130;
+  c.width = W * dpr;
+  c.height = H * dpr;
+  c.style.width = '100%';
+  c.style.height = H + 'px';
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // bg
+  ctx.fillStyle = '#f7efd8';
+  ctx.fillRect(0, 0, W, H);
+  if (!data || data.length < 2) {
+    ctx.fillStyle = '#8a8068';
+    ctx.font = 'italic 12px Fraunces, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Not enough data yet', W/2, H/2);
+    return;
+  }
+  const maxV = Math.max(...data, 1);
+  // The x-axis spans simTime 0 to (data.length-1)*sampleInterval
+  // We sample every 2 weeks, so total weeks = (data.length-1)*2 (rough)
+  const totalWeeks = state.simTime || ((data.length-1) * 2);
+  const xForTime = (t) => (t / Math.max(1, totalWeeks)) * W;
+
+  // grid
+  ctx.strokeStyle = '#d9c9a0';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    const y = Math.floor(H * (i/5)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Event markers (drawn behind line)
+  const events = opts.events || [];
+  const eventColors = {
+    harshWinter: '#4a6b8a',
+    predator: '#8b4040',
+    drought: '#b88a3c',
+    epidemic: '#6b7c4a',
+    plentiful: '#5b7048',
+  };
+  const hitZones = [];
+  for (const e of events) {
+    const x = xForTime(e.simTime);
+    if (x < 0 || x > W) continue;
+    const col = eventColors[e.event] || '#888';
+    // Vertical line
+    ctx.strokeStyle = col + '88';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+    // Small dot at top
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, 6, 3, 0, Math.PI*2);
+    ctx.fill();
+    // Hit zone for tap
+    hitZones.push({ x, y: 0, w: 8, h: H, event: e });
+  }
+
+  // area fill
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = (i/(data.length-1)) * W;
+    const y = H - (data[i]/maxV) * (H-10) - 4;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+  // line on top
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = (i/(data.length-1)) * W;
+    const y = H - (data[i]/maxV) * (H-10) - 4;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  // max-value tick
+  ctx.fillStyle = '#8a8068';
+  ctx.font = '10px Albert Sans, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(maxV.toFixed(maxV < 1 ? 2 : 0), 4, 12);
+
+  // Store hit zones for click handler
+  c._hitZones = hitZones;
+  c._chartW = W;
+  c._chartH = H;
+  // Attach click handler if not already
+  if (!c._tooltipBound) {
+    c._tooltipBound = true;
+    c.addEventListener('click', (e) => {
+      const rect = c.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width) * (c._chartW || W);
+      const py = ((e.clientY - rect.top) / rect.height) * (c._chartH || H);
+      // Find nearest hit zone within 16px
+      let best = null, bestDx = 16;
+      for (const z of (c._hitZones || [])) {
+        const dx = Math.abs(z.x - px);
+        if (dx < bestDx) { bestDx = dx; best = z; }
+      }
+      if (best) showChartTooltip(c, best, e.clientX, e.clientY);
+      else hideChartTooltip();
+    });
+  }
+}
+
+// Singleton tooltip for chart event markers
+function showChartTooltip(canvas, hitZone, clientX, clientY) {
+  let tip = document.getElementById('chartTooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'chartTooltip';
+    document.body.appendChild(tip);
+  }
+  const e = hitZone.event;
+  const eventLabels = {
+    harshWinter: 'Harsh Winter',
+    predator: 'Predator',
+    drought: 'Drought',
+    epidemic: 'Epidemic',
+    plentiful: 'Plentiful',
+  };
+  const week = Math.floor(e.simTime);
+  const year = Math.floor(e.simTime / 52) + 1;
+  tip.innerHTML = `<div class="ct-title">${eventLabels[e.event] || e.event}</div>
+    <div class="ct-when">Week ${week} · Year ${year} · ${e.season}</div>
+    <div class="ct-msg">${e.message || ''}</div>`;
+  tip.style.display = 'block';
+  // Position above the click
+  const tipW = 220;
+  let left = clientX - tipW/2;
+  if (left < 8) left = 8;
+  if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+  tip.style.left = left + 'px';
+  tip.style.top = (clientY - 8) + 'px';
+  // Auto-hide after a bit
+  clearTimeout(tip._timer);
+  tip._timer = setTimeout(hideChartTooltip, 5000);
+}
+
+function hideChartTooltip() {
+  const tip = document.getElementById('chartTooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+// Multi-series chart for behavioral gene drift
+function drawGeneDriftChart(canvasId) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const series = [
+    {name:'bold',    key:'boldness',    color:'#b3603e'},
+    {name:'social',  key:'sociability', color:'#5b7048'},
+    {name:'play',    key:'playfulness', color:'#b88a3c'},
+    {name:'aggro',   key:'aggression',  color:'#c47a6e'},
+    {name:'energy',  key:'energy',      color:'#4a6b8a'},
+    {name:'appetite',key:'appetite',    color:'#7a5a3a'},
+  ];
+  const dpr = window.devicePixelRatio || 1;
+  let W = Math.floor(c.getBoundingClientRect().width);
+  if (W < 50 && c.parentElement) W = Math.max(240, Math.floor(c.parentElement.getBoundingClientRect().width) - 28);
+  if (W < 50) W = 320;
+  const H = 170;
+  c.width = W * dpr; c.height = H * dpr;
+  c.style.width = '100%'; c.style.height = H + 'px';
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#f7efd8';
+  ctx.fillRect(0, 0, W, H);
+
+  // Use 0-1 range for all behavioral genes
+  const chartH = H - 28;          // leave room for legend
+  // Grid at 0.25, 0.5, 0.75
+  ctx.strokeStyle = '#d9c9a0';
+  ctx.lineWidth = 1;
+  for (const frac of [0.25, 0.5, 0.75]) {
+    const y = Math.floor(chartH - frac*chartH) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // 0.5 label
+  ctx.fillStyle = '#a39a7a';
+  ctx.font = '10px Albert Sans, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('0.5', 4, Math.floor(chartH * 0.5) - 2);
+
+  // Find max length to align all series to same x-axis
+  let maxLen = 0;
+  for (const s of series) maxLen = Math.max(maxLen, state.geneHistory[s.key].length);
+  if (maxLen < 2) {
+    ctx.fillStyle = '#8a8068';
+    ctx.font = 'italic 12px Fraunces, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Not enough data yet', W/2, chartH/2);
+    return;
+  }
+
+  for (const s of series) {
+    const data = state.geneHistory[s.key];
+    if (data.length < 2) continue;
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = (i/(maxLen-1)) * W;
+      const y = chartH - data[i] * chartH;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  // Legend along bottom
+  ctx.font = '9px Albert Sans, sans-serif';
+  ctx.textBaseline = 'middle';
+  const legY = H - 12;
+  let legX = 6;
+  for (const s of series) {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(legX, legY - 3, 8, 6);
+    legX += 11;
+    ctx.fillStyle = '#5e5a48';
+    ctx.textAlign = 'left';
+    ctx.fillText(s.name, legX, legY);
+    legX += ctx.measureText(s.name).width + 10;
+  }
+}
+
+function restart() {
+  // Reset state and go back to setup
+  state.cats = [];
+  state.food = [];
+  state.feedSpots = [];
+  state.events = [];
+  state.history = [];
+  state.diversityHistory = [];
+  state.geneHistory = { boldness:[], sociability:[], playfulness:[], aggression:[], energy:[], appetite:[], bodyScale:[] };
+  state.deceased = [];
+  state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
+  state.founders = [];
+  parentsById.clear();
+  state.founderGenes = null;
+  state.lastDriftAnnouncement = {};
+  state.firsts = {};
+  state.endCause = '';
+  state.endedByUser = false;
+  state.season = 'spring';
+  state.year = 1;
+  state.diseaseOutbreaks = 0;
+  state.activeEvent = null;
+  state.activeEventMessage = '';
+  state.eventLog = [];
+  state.eventTimeline = [];
+  state.climate = makeStartingWeather();
+  state.simTime = 0;
+  state.totalBorn = 2;
+  state.totalDied = 0;
+  state.stillborn = 0;
+  state.generation = 1;
+  state.longestLife = 0;
+  state.longestLifeName = '';
+  state.speed = 1;
+  state._endTimer = 0;
+  state.lastAutoFood = 0;
+  state.lastTime = 0;
+  state.phase = 'setup';
+  // Reset speed buttons to 1×
+  document.querySelectorAll('.speed-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.speed === '1');
+  });
+  document.getElementById('end').classList.remove('active');
+  document.getElementById('game').classList.remove('active');
+  document.getElementById('setup').style.display = 'flex';
+  initSetup();
+}
+
+// ─── SETUP UI ─────────────────────────────────────────────────
+function initSetup() {
+  // Stage both cats
+  state.starter.A = { sex:'M', genes: rollGenes('M'), name: pick(NAME_POOL) };
+  state.starter.B = { sex:'F', genes: rollGenes('F'), name: pick(NAME_POOL) };
+  refreshCard('A');
+  refreshCard('B');
+}
+
+function refreshCard(key) {
+  const cat = state.starter[key];
+  const ph = calculatePhenotype(cat.genes, cat.sex);
+  // preview
+  const canvasEl = document.querySelector(`canvas[data-preview="${key}"]`);
+  const ctx = canvasEl.getContext('2d');
+  ctx.clearRect(0,0,canvasEl.width, canvasEl.height);
+  // background subtle
+  ctx.fillStyle = 'rgba(0,0,0,0)';
+  ctx.fillRect(0,0,canvasEl.width, canvasEl.height);
+  const fake = { ...cat, phenotype: ph, age: 60, stage:'adult', state:'wander', floatTexts:[], bornFlash:0, id: key==='A'?1:2 };
+  drawCat(ctx, fake, canvasEl.width/2, canvasEl.height/2 + 10, 2.2, 0);
+
+  // name
+  document.querySelector(`input[data-name="${key}"]`).value = cat.name;
+
+  // tags
+  const tagWrap = document.querySelector(`[data-tags="${key}"]`);
+  tagWrap.innerHTML = '';
+  for (const t of genesToTags(cat.genes, cat.sex, ph)) {
+    const span = document.createElement('span');
+    span.className = 'tag';
+    span.textContent = t;
+    tagWrap.appendChild(span);
+  }
+
+  // sliders
+  const sliderWrap = document.querySelector(`[data-sliders="${key}"]`);
+  sliderWrap.innerHTML = '';
+  for (const trait of ['boldness','sociability','playfulness','aggression','energy','appetite']) {
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'slider-label';
+    const niceName = trait[0].toUpperCase()+trait.slice(1);
+    lbl.innerHTML = `<span>${niceName}</span><span class="val">${(cat.genes[trait]*100).toFixed(0)}</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = 0; inp.max = 100;
+    inp.value = Math.round(cat.genes[trait]*100);
+    inp.addEventListener('input', () => {
+      cat.genes[trait] = inp.value/100;
+      lbl.querySelector('.val').textContent = inp.value;
+      // Update tags
+      const newph = calculatePhenotype(cat.genes, cat.sex);
+      tagWrap.innerHTML='';
+      for (const t of genesToTags(cat.genes, cat.sex, newph)) {
+        const span = document.createElement('span');
+        span.className = 'tag';
+        span.textContent = t;
+        tagWrap.appendChild(span);
+      }
+    });
+    row.appendChild(lbl);
+    row.appendChild(inp);
+    sliderWrap.appendChild(row);
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const reroll = e.target.closest('[data-reroll]');
+  if (reroll) {
+    const k = reroll.dataset.reroll;
+    state.starter[k] = { sex: k==='A'?'M':'F', genes: rollGenes(k==='A'?'M':'F'), name: pick(NAME_POOL) };
+    refreshCard(k);
+    return;
+  }
+  const rerollLook = e.target.closest('[data-reroll-look]');
+  if (rerollLook) {
+    const k = rerollLook.dataset.rerollLook;
+    const cur = state.starter[k];
+    const sex = cur.sex;
+    const newg = rollGenes(sex);
+    // keep behavioral, replace visible
+    for (const v of ['B','D','A','T','S','L','W','O']) cur.genes[v] = newg[v];
+    refreshCard(k);
+    return;
+  }
+  const expBtn = e.target.closest('.expander-toggle');
+  if (expBtn) {
+    expBtn.parentElement.classList.toggle('open');
+    return;
+  }
+  if (e.target.id === 'rollBoth') {
+    state.starter.A = { sex:'M', genes: rollGenes('M'), name: pick(NAME_POOL) };
+    state.starter.B = { sex:'F', genes: rollGenes('F'), name: pick(NAME_POOL) };
+    refreshCard('A'); refreshCard('B');
+    return;
+  }
+  if (e.target.id === 'beginBtn') {
+    beginSim();
+    return;
+  }
+});
+document.addEventListener('input', (e) => {
+  if (e.target.dataset.name) {
+    state.starter[e.target.dataset.name].name = e.target.value;
+  }
+});
+
+// ─── BEGIN SIM ────────────────────────────────────────────────
+let canvas, ctx;
+function beginSim() {
+  // hide setup, show game
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').classList.add('active');
+  state.phase = 'running';
+  state.cats = [];
+  state.food = [];
+  state.feedSpots = [];
+  state.simTime = 0;
+  state.lastTime = 0;
+  state.events = [];
+  state.history = [];
+  state.diversityHistory = [];
+  state.geneHistory = { boldness:[], sociability:[], playfulness:[], aggression:[], energy:[], appetite:[], bodyScale:[] };
+  state.season = 'spring';
+  state.year = 1;
+  state.diseaseOutbreaks = 0;
+  state.activeEvent = null;
+  state.activeEventMessage = '';
+  state.eventLog = [];
+  state.eventTimeline = [];
+  state.climate = makeStartingWeather();
+  state.deceased = [];
+  state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
+  state.colonyScale = 1;
+
+  // resize canvas
+  canvas = document.getElementById('arena');
+  resize();
+
+  // Place feeding spots — fixed locations where food regenerates
+  // Distribute roughly evenly across the arena
+  for (let i = 0; i < FEED_SPOTS_COUNT; i++) {
+    const ang = (i / FEED_SPOTS_COUNT) * Math.PI * 2 + Math.random()*0.4 - 0.2;
+    const radius = Math.min(arenaW, arenaH) * 0.28;
+    state.feedSpots.push({
+      x: arenaW/2 + Math.cos(ang) * radius + (Math.random()-0.5)*30,
+      y: arenaH/2 + Math.sin(ang) * radius + (Math.random()-0.5)*30,
+    });
+  }
+
+  // build starting cats — male and female, both adult, placed in middle
+  const A = createCat({
+    sex:'M', genes: state.starter.A.genes, name: state.starter.A.name,
+    age: 50,
+    x: arenaW*0.4, y: arenaH*0.5,
+  });
+  A._gen = 1;
+  const B = createCat({
+    sex:'F', genes: state.starter.B.genes, name: state.starter.B.name,
+    age: 50,
+    x: arenaW*0.6, y: arenaH*0.5,
+  });
+  B._gen = 1;
+  state.cats.push(A, B);
+  state.founders = [A.id, B.id];
+  recordFirsts(A);
+  recordFirsts(B);
+  // Snapshot founder behavioral gene means for live drift narration
+  state.founderGenes = {};
+  state.lastDriftAnnouncement = {};
+  for (const t of ['boldness','sociability','playfulness','aggression','energy','appetite']) {
+    state.founderGenes[t] = (A.genes[t] + B.genes[t]) / 2;
+  }
+  state.founderGenes.bodyScale = (A.bodyScale + B.bodyScale) / 2;
+  state.lastDriftCheck = 0;
+  // bias them toward each other initially
+  A.social = 0.3; B.social = 0.3;
+  logEvent(`${A.name} & ${B.name} settle into the colony.`, 'event');
+  // seed initial food at the feeding spots
+  for (const spot of state.feedSpots) {
+    const ang = Math.random() * Math.PI * 2;
+    dropFood(spot.x + Math.cos(ang)*15, spot.y + Math.sin(ang)*15);
+  }
+}
+
+// We use a virtual canvas size in logical pixels.
+// arenaW / arenaH hold the logical drawing size.
+let arenaW = 0, arenaH = 0;
+function resize() {
+  canvas = document.getElementById('arena');
+  const dpr = window.devicePixelRatio || 1;
+  arenaW = window.innerWidth;
+  arenaH = window.innerHeight;
+  canvas.width = arenaW * dpr;
+  canvas.height = arenaH * dpr;
+  canvas.style.width = arenaW + 'px';
+  canvas.style.height = arenaH + 'px';
+  const ctx2 = canvas.getContext('2d');
+  ctx2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Shadow logical dims onto canvas object for any old refs:
+  canvas._w = arenaW;
+  canvas._h = arenaH;
+}
+
+window.addEventListener('resize', () => {
+  if (state.phase !== 'setup') resize();
+});
+
+// arena tap
+window.addEventListener('DOMContentLoaded', () => {
+  const arena = document.getElementById('arena');
+  arena.addEventListener('click', onArenaTap);
+
+  // speed controls
+  document.getElementById('speedControls').addEventListener('click', (e) => {
+    const btn = e.target.closest('.speed-btn');
+    if (!btn) return;
+    const sp = parseInt(btn.dataset.speed);
+    state.speed = sp;
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', b===btn));
+  });
+
+  // Evolution tracker toggle
+  document.getElementById('evoToggle').addEventListener('click', () => {
+    const tr = document.getElementById('evoTracker');
+    tr.classList.toggle('hidden');
+    if (!tr.classList.contains('hidden')) renderEvoTracker();
+  });
+
+  // End run button → confirmation modal
+  document.getElementById('endRunBtn').addEventListener('click', () => {
+    if (state.phase !== 'running') return;
+    document.getElementById('confirmModal').classList.remove('hidden');
+  });
+  document.getElementById('confirmCancel').addEventListener('click', () => {
+    document.getElementById('confirmModal').classList.add('hidden');
+  });
+  document.getElementById('confirmEnd').addEventListener('click', () => {
+    document.getElementById('confirmModal').classList.add('hidden');
+    state.endedByUser = true;
+    // Snapshot all surviving cats into deceased so the end screen has full data
+    for (const c of state.cats) {
+      if (!c.dying) {
+        // Use synthetic death — adds them to deceased without playing the fade
+        const snap = {
+          id: c.id, name: c.name, sex: c.sex, age: c.age, bornAt: c.bornAt,
+          diedAt: state.simTime, diedOf: 'survived',
+          children: c.children.length, childrenIds: [...c.children],
+          parents: c.parents ? [...c.parents] : null,
+          fightCount: c.fightCount || 0,
+          inbreedF: c.inbreedF || 0, bodyScale: c.bodyScale || 1,
+          phenotype: c.phenotype, genes: c.genes, gen: c._gen || 1,
+          wasFounder: state.founders.includes(c.id),
+        };
+        // Update all-time records with survivors
+        const r = state.records;
+        if (!r.oldest      || snap.age        > r.oldest.age)            r.oldest = snap;
+        if (!r.mostProlific|| snap.children   > r.mostProlific.children) r.mostProlific = snap;
+        if (!r.mostFights  || snap.fightCount > r.mostFights.fightCount) r.mostFights = snap;
+        if (!r.mostInbred  || snap.inbreedF   > r.mostInbred.inbreedF)   r.mostInbred = snap;
+        if (!r.biggest     || snap.bodyScale  > r.biggest.bodyScale)     r.biggest = snap;
+        state.deceased.push(snap);
+        if (state.deceased.length > 400) state.deceased.shift();
+      }
+    }
+    endSimulation();
+  });
+
+  initSetup();
+  requestAnimationFrame(tick);
+});
+
+window.restart = restart;
+
+</script>
+</body>
+</html>

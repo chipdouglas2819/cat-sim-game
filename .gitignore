@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (for the upcoming sim.js refactor + bench harness)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+pnpm-lock.yaml.bak
+
+# Build / output
+dist/
+build/
+coverage/
+
+# Bench output
+bench/results/
+*.bench.json
+*.bench.csv
+
+# Env
+.env
+.env.local
