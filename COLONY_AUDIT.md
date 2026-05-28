@@ -34,10 +34,10 @@ nursing transfers + opportunistic eating let many cats survive on little. The in
 equilibrium isn't holding. Needs investigation — possibly nursing is too generous, or food per
 morsel feeds too many. This is also why evolution stays flat (huge pop resists drift).
 
-### M2. seek_food vs opportunistic eating inconsistency
+### M2. seek_food vs opportunistic eating inconsistency — **FIXED**
 A cat actively foraging eats a flat 0.75 per bite. A cat opportunistically grabbing food eats
 `0.6 + bodyScale*0.25 + boldness*0.1`. So the big-cat eating advantage only applies to one of the
-two eating paths. Should use the same biteCap in both.
+two eating paths. Fix: both paths now use the same `0.6 + bodyScale*0.25 + boldness*0.1` biteCap.
 
 ### M3. Dead code: popPressure() and POP_HARD_CEILING — **FIXED**
 `popPressure()` has no callers (removed when food-capacity replaced it). `POP_HARD_CEILING = 80` is
@@ -52,11 +52,13 @@ breaks silently. Added braces.
 ### N2. setTimeout for kitten cry uses real-world ms in a speed-scaled sim
 At 8× the 1500ms cry-cooldown is effectively much longer in sim-time. Cosmetic.
 
-### N3. state.food.indexOf() inside eat — O(n) lookup
-Minor since food is capped, but splicing by indexOf scans the array. Could track index directly.
+### N3. state.food.indexOf() inside eat — O(n) lookup — **FIXED**
+Minor since food is capped, but splicing by indexOf scans the array. Fix: `findNearestFood` now
+returns the index alongside the target, so the eat path splices directly by index.
 
-### N4. Maternal grief setTimeout / floatText spam not throttled at high pop
+### N4. Maternal grief setTimeout / floatText spam not throttled at high pop — **FIXED**
 Grief and cries push floatTexts even when 2000 cats exist. Throttled elsewhere but not here.
+Fix: maternal grief float now skipped when population exceeds 500.
 
 ## What I fixed this pass
 - A1 (memory leak — capped deceased + incremental records)
@@ -64,7 +66,12 @@ Grief and cries push floatTexts even when 2000 cats exist. Throttled elsewhere b
 - M3 (dead code)
 - N1 (diversity braces)
 
+## Follow-up pass
+- M2 (eating consistency — both paths now share biteCap formula)
+- N3 (food.indexOf — findNearestFood returns idx)
+- N4 (grief float throttled at pop > 500)
+
 ## What still needs work (bigger jobs)
 - A3 (behavioral diversity metric) — needs new chart series
 - M1 (population won't stay low) — needs tuning investigation, best done with the headless harness
-- M2 (eating consistency) — quick but wanted to keep this pass focused
+- N2 (kitten cry setTimeout uses real ms in speed-scaled sim) — cosmetic

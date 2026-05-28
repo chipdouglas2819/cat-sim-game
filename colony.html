@@ -2247,12 +2247,13 @@ function findNearest(cat, predicate, maxDist=Infinity) {
 }
 
 function findNearestFood(cat) {
-  let best = null, bestD = Infinity;
-  for (const f of state.food) {
+  let best = null, bestD = Infinity, bestIdx = -1;
+  for (let i = 0; i < state.food.length; i++) {
+    const f = state.food[i];
     const d = Math.hypot(cat.x-f.x, cat.y-f.y);
-    if (d < bestD) { best = f; bestD = d; }
+    if (d < bestD) { best = f; bestD = d; bestIdx = i; }
   }
-  return { target: best, d: bestD };
+  return { target: best, d: bestD, idx: bestIdx };
 }
 
 function chooseAction(cat) {
@@ -2768,7 +2769,9 @@ function executeState(cat, dt) {
         cat.hunger = clamp(cat.hunger + eaten, 0, 1);
         f.target.amount -= eaten;
         if (f.target.amount <= 0.01) {
-          state.food.splice(state.food.indexOf(f.target), 1);
+          // idx may be stale if food shifted since findNearestFood; guard it
+          if (state.food[f.idx] === f.target) state.food.splice(f.idx, 1);
+          else state.food.splice(state.food.indexOf(f.target), 1);
         }
         cat.state='wander';
         cat.stateTimer = 1;
@@ -3057,7 +3060,7 @@ function triggerDeath(cat, reason) {
     const mom = (() => { const _m = catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
     if (mom) {
       mom.social = Math.min(mom.social, 0.15);   // social drive blunted
-      mom.floatTexts.push({text: '…', t: 0, life: 2});
+      if (state.cats.length < 500) mom.floatTexts.push({text: '…', t: 0, life: 2});
     }
   }
 }
