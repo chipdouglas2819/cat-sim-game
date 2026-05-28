@@ -1125,52 +1125,15 @@ import {
   rollGenes, inheritGenes, calculatePhenotype, patternName, genesToTags,
 } from './src/sim/genetics.js';
 
+import { Simulation } from './src/sim/simulation.js';
+
 // ─── STATE ────────────────────────────────────────────────────
-const state = {
-  phase: 'setup',                     // setup | running | ended
-  cats: [],
-  food: [],
-  feedSpots: [],                      // fixed anchor points around which food spawns
-  nextId: 1,
-  simTime: 0,                         // sim-days elapsed
-  speed: 1,
-  lastTime: 0,
-  lastAutoFood: 0,
-  generation: 1,
-  totalBorn: 2,
-  totalDied: 0,
-  stillborn: 0,
-  events: [],                         // {simTime, text, type}
-  history: [],                        // population samples for chart
-  diversityHistory: [],               // genetic diversity samples
-  geneHistory: {                      // gene-mean over time (behavioral genes)
-    boldness: [], sociability: [], playfulness: [],
-    aggression: [], energy: [], appetite: [],
-    bodyScale: []
-  },
-  selectedCatId: null,
-  starter: { A: null, B: null },      // staged starter cat configs
-  longestLife: 0,
-  longestLifeName: '',
-  oldestEver: null,
-  notableEvents: [],
-  deceased: [],                       // snapshots of every cat who died for end-of-run hall
-  founders: [],                       // ids of the starting pair
-  firsts: {},                         // {phenotypeKey: catName} — tracks first appearances
-  endCause: '',                       // reason the run ended
-  endedByUser: false,                 // true if user pressed End Run
-  season: 'spring',                   // current season (auto-derived from simTime)
-  year: 1,                            // year count (1-indexed)
-  diseaseOutbreaks: 0,                // track for end screen
-  activeEvent: null,                  // current environmental event
-  activeEventMessage: '',
-  eventLog: [],                       // history of events for end screen
-  eventTimeline: [],                  // {simTime, event, season, message} for chart markers
-  records: {                          // all-time record holders (tracked incrementally to avoid scanning huge deceased array)
-    oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null,
-  },
-  colonyScale: 1,                     // carrying-capacity multiplier (player setting): smaller = faster evolution
-};
+// The Simulation instance owns all sim state. `state` is an alias so existing
+// state.X access keeps working unchanged. Phase 1c-ii will start moving the
+// tick loop and helpers into Simulation methods so the bench harness can
+// step a sim with no DOM.
+const sim = new Simulation();
+const state = sim;
 
 // ─── UTILS ────────────────────────────────────────────────────
 // rand, randInt, pick, clamp, dist, gauss imported from ./src/sim/util.js
@@ -1288,7 +1251,7 @@ function ageStage(age) {
 
 // Rough inbreeding coefficient via ancestor overlap. Walks up 4 generations.
 // Uses parentsById (built from living + deceased) so lineage works across deaths.
-const parentsById = new Map();   // catId -> [momId, dadId] | null
+const parentsById = sim.parentsById;   // catId -> [momId, dadId] | null
 
 function recordParents(catId, parents) {
   if (parents) parentsById.set(catId, parents);
@@ -1992,9 +1955,9 @@ function applyEnvironmentalPressure(cat, dt) {
 // Built once per tick. Queries only inspect cells within range
 // instead of every cat. Critical for performance at high pop.
 const SPATIAL_CELL = 100;            // cell size in logical px
-let spatialGrid = new Map();         // "cx,cy" → array of cats
+const spatialGrid = sim.spatialGrid; // "cx,cy" → array of cats (lives on sim)
 let spatialCellsW = 0, spatialCellsH = 0;
-let catById = new Map();             // O(1) cat lookup by id
+const catById = sim.catById;         // O(1) cat lookup by id (lives on sim)
 
 function rebuildSpatialIndex() {
   spatialGrid.clear();
