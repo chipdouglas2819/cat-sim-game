@@ -49,8 +49,11 @@ never enforced. Both are leftover. Removed popPressure; kept the constant commen
 `if (...) het++; n++;` works only because `n++` is meant to be unconditional. One reflow and it
 breaks silently. Added braces.
 
-### N2. setTimeout for kitten cry uses real-world ms in a speed-scaled sim
-At 8× the 1500ms cry-cooldown is effectively much longer in sim-time. Cosmetic.
+### N2. setTimeout for kitten cry uses real-world ms in a speed-scaled sim — **FIXED**
+At 8× the 1500ms cry-cooldown is effectively much longer in sim-time. Fix: replaced
+`setTimeout(() => { cat._cryShown = false; }, 1500)` with a sim-time countdown
+(`cat._cryUntil = sim.simTime + 0.4` weeks ≈ 1.5 real-seconds at 1×), so throttling
+is consistent across all speeds and works in headless runs.
 
 ### N3. state.food.indexOf() inside eat — O(n) lookup — **FIXED**
 Minor since food is capped, but splicing by indexOf scans the array. Fix: `findNearestFood` now
@@ -70,8 +73,12 @@ Fix: maternal grief float now skipped when population exceeds 500.
 - M2 (eating consistency — both paths now share biteCap formula)
 - N3 (food.indexOf — findNearestFood returns idx)
 - N4 (grief float throttled at pop > 500)
+- N2 (kitten cry — converted from setTimeout to sim-time countdown during the
+  sim.js refactor, since headless runs have no event loop)
 
 ## What still needs work (bigger jobs)
-- A3 (behavioral diversity metric) — needs new chart series
-- M1 (population won't stay low) — needs tuning investigation, best done with the headless harness
-- N2 (kitten cry setTimeout uses real ms in speed-scaled sim) — cosmetic
+- A3 (behavioral diversity metric) — needs new chart series. The diversity
+  module already computes behavioral spread, but the chart only plots the
+  blended index. Could split into two series.
+- M1 (population won't stay low) — needs tuning investigation, best done with
+  the headless harness once Phase 2 lands.
