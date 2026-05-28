@@ -19,6 +19,19 @@ export const gauss = () => {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 };
 
+// Lighten a #rrggbb hex color toward white by `amt` (0-1). Returns hex.
+// Used by createCat (smoke trait modifies coat hex) and render code.
+export function lightenHex(hex, amt) {
+  if (!hex || !hex.startsWith('#')) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const nr = Math.floor(r + (255 - r) * amt);
+  const ng = Math.floor(g + (255 - g) * amt);
+  const nb = Math.floor(b + (255 - b) * amt);
+  return '#' + [nr, ng, nb].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 // Seeded PRNG (mulberry32) — pass the result to setRandomSource() for reproducible runs.
 export function mulberry32(seed) {
   let a = seed >>> 0;
