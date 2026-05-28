@@ -101,8 +101,14 @@ export function chooseAction(sim, cat) {
   if ((cat.stage === 'adult' || cat.stage === 'senior') &&
       sim.simTime > cat.cooldownUntil &&
       cat.hunger > 0.45 && cat.energy > 0.35) {
+    // Suppress breeding while food per cat is still fairly comfortable (below
+    // ~0.6) so the colony caps WITH a food surplus instead of breeding until
+    // food runs short. This keeps food from being the binding constraint, so
+    // food-competition traits stop being selected baseline and the environment
+    // events become the differentiator (audit B3/B4 — traits were one-way
+    // because constant food competition washed events out).
     const foodPerCat = sim.food.length / Math.max(1, sim.cats.length);
-    const scarcity = clamp((0.35 - foodPerCat) / 0.35, 0, 1);  // 0 = plentiful, 1 = none
+    const scarcity = clamp((0.6 - foodPerCat) / 0.6, 0, 1);  // 0 = plentiful, 1 = none
     const willingThreshold = 0.35 - cat.genes.sociability * 0.2 - cat.genes.playfulness * 0.1 + scarcity * 0.9;
     if (rand() > willingThreshold) {
       const partner = findNearest(sim, cat, c =>
