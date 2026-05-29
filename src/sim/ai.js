@@ -111,13 +111,18 @@ export function chooseAction(sim, cat) {
     const scarcity = clamp((0.4 - foodPerCat) / 0.4, 0, 1);  // 0 = plentiful, 1 = none
     const willingThreshold = 0.35 - cat.genes.sociability * 0.2 - cat.genes.playfulness * 0.1 + scarcity * 0.9;
     if (rand() > willingThreshold) {
+      // Local mate preference: a tighter search radius (220→150) means cats
+      // mostly pair within their territory, so neighborhoods slowly diverge into
+      // genetically distinguishable family lines. Migrants/wandering toms still
+      // mix it up. Wandering toms range wider (they roam between territories).
+      const mateRadius = cat._wanderer ? 230 : 150;
       const partner = findNearest(sim, cat, c =>
         c.sex !== cat.sex &&
         (c.stage === 'adult' || c.stage === 'senior') &&
         !c.pregnantWith &&
         sim.simTime > c.cooldownUntil &&
         c.hunger > 0.4 && c.energy > 0.35
-      , 220);
+      , mateRadius);
       if (partner.target) {
         const female = cat.sex === 'F' ? cat : partner.target;
         if (female.inEstrus) {
@@ -434,7 +439,8 @@ export function executeState(sim, cat, dt, sinks) {
       // when they stray too far, so matrilines cluster into family territories
       // (kittens inherit mom's home + drift). Bold cats range further; timid cats
       // stay close. Food-seeking (a different state) still overrides this.
-      if (cat.homeX != null) {
+      // Wandering toms have no home and roam the whole colony (skip the pull).
+      if (cat.homeX != null && !cat._wanderer) {
         const dxH = cat.homeX - cat.x, dyH = cat.homeY - cat.y;
         const dH = Math.hypot(dxH, dyH) || 1;
         const range = 55 + boldness * 90;        // tolerated roam radius from home

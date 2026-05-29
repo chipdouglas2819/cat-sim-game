@@ -323,6 +323,15 @@ export function giveBirth(sim, mom, sinks) {
     });
     sim.parentsById.set(kitten.id, [mom.id, father.id]);
     kitten.hunger = 0.85;
+    // HYBRID VIGOR — a kitten from fresh blood (one parent a migrant or wandering
+    // tom) gets a real F1 health edge: longer life + better condition. The mirror
+    // of inbreeding depression; makes outcrossing visibly worthwhile.
+    if (mom._migrant || father._migrant || mom._wanderer || father._wanderer) {
+      kitten.lifespan *= 1.12;
+      kitten.condition = Math.min(1, kitten.condition + 0.12);
+      kitten.rareTraits.push('hybrid');
+      kitten._hybrid = true;
+    }
     sim.cats.push(kitten);
     sim.totalBorn++;
     mom.children.push(kitten.id);

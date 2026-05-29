@@ -229,6 +229,7 @@ export class Simulation {
       if (this.driftWeatherEnabled) driftWeather(this);
       this._narrateDrift();
       this._maybeMigrant();
+      this._maybeWanderingTom();
     }
 
     // Tally how long each event type is active (for bench environment correlation)
@@ -389,9 +390,32 @@ export class Simulation {
       x, y, homeX: x, homeY: y,
     });
     m._gen = this.generation;                // joins at the colony's current generation
+    m._migrant = true;                       // fresh blood → its kittens get hybrid vigor
     this.cats.push(m);
     recordFirsts(this, m);
     this.logEvent(`A stray ${sex === 'F' ? 'female' : 'male'} joins the colony.`, 'event');
+  }
+
+  // Rare WANDERING TOM — an unrelated roaming male with no fixed home range. He
+  // ranges across the whole colony (skips the territorial home-pull) and sires
+  // kittens in many territories, spreading one fresh bloodline widely — a real
+  // feral dynamic and a fast diversity injector. Rarer than ordinary migrants.
+  _maybeWanderingTom() {
+    const pop = this.livingCount();
+    if (pop < 8 || pop > 200) return;
+    if (rand() > 0.10) return;               // ~once per decade
+    const tom = createCat(this, {
+      sex: 'M', genes: rollGenes('M'),
+      age: 45 + Math.floor(rand() * 40),
+      x: this.arenaW / 2, y: this.arenaH / 2,
+    });
+    tom._gen = this.generation;
+    tom._migrant = true;
+    tom._wanderer = true;                     // no home pull → roams + sires widely
+    tom.genes.boldness = clamp(0.6 + rand() * 0.3, 0, 0.95);  // bold rover
+    this.cats.push(tom);
+    recordFirsts(this, tom);
+    this.logEvent(`A wandering tom roams into the colony.`, 'event');
   }
 
   // Count living (non-dying) cats. A run is biologically over at <= 1
