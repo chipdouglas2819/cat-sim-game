@@ -1361,15 +1361,7 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
     ctx.fill();
   }
 
-  // float texts (near-miss / event flashes)
-  for (const ft of cat.floatTexts) {
-    const a = 1 - ft.t/ft.life;
-    if (a <= 0) continue;
-    ctx.font = `italic ${12*scale}px Fraunces, serif`;
-    ctx.fillStyle = `rgba(60,50,30,${a*0.9})`;
-    ctx.textAlign = 'center';
-    ctx.fillText(ft.text, x, y - 22*scale - ft.t*14);
-  }
+  // (per-cat floating pop-up text removed — the floatText system is gone)
   // Restore original phenotype colors that we temporarily tinted
   if (origBaseHex !== null) ph.baseHex = origBaseHex;
   if (origOrangeHex !== null) ph.orangeHex = origOrangeHex;

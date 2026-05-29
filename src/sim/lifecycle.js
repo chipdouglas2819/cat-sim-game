@@ -14,8 +14,6 @@ const FLOAT_SINK = { push() {} };
 // The per-cat floating pop-up comment system was removed (laggy, low value —
 // meaningful events go to the top-of-screen log instead). cat.floatTexts is a
 // shared no-op sink so the scattered .push() calls cost nothing and nothing
-// renders. Render + decay loops were deleted.
-const FLOAT_SINK = { push() {} };
 
 // Map age (weeks) to life stage.
 export function ageStage(age) {
