@@ -1244,9 +1244,10 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
   ctx.ellipse(0, 4*s, 16*s*fluff*pregBelly, 5*s*pregBelly, 0, 0, Math.PI*2);
   ctx.fill();
 
-  // tail (drawn first, behind body)
+  // tail (drawn first, behind body). Colorpoint cats have a dark point-colored tail.
+  const extremityHex = ph.pointed && ph.pointHex ? ph.pointHex : ph.baseHex;
   const tailLen = (ph.longHair?16:13)*s;
-  ctx.strokeStyle = ph.baseHex;
+  ctx.strokeStyle = extremityHex;
   ctx.lineWidth = (ph.longHair?5:3.5)*s;
   ctx.lineCap = 'round';
   const tailWag = Math.sin(state.simTime*4 + cat.id) * 0.3;
@@ -1263,8 +1264,8 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
   ctx.save();
   ctx.translate(10*s, 0);
 
-  // ears
-  ctx.fillStyle = ph.baseHex;
+  // ears — colorpoint cats have dark point-colored ears
+  ctx.fillStyle = extremityHex;
   ctx.beginPath();
   ctx.moveTo(-3*s, -headR*0.6);
   ctx.lineTo(-5*s, -headR*1.4);
@@ -1283,6 +1284,16 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
   ctx.beginPath();
   ctx.arc(0, 0, headR, 0, Math.PI*2);
   ctx.fill();
+
+  // colorpoint mask — dark muzzle/face point on the front of the head
+  if (ph.pointed && ph.pointHex) {
+    ctx.fillStyle = ph.pointHex;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.ellipse(headR*0.55, 0, headR*0.5, headR*0.45, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   // tortie/calico head patch (clipped to head)
   if (ph.baseColor === 'tortie' || ph.baseColor === 'calico') {

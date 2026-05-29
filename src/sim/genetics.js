@@ -12,6 +12,7 @@ export function rollGenes(sex) {
     S: [rand() < 0.4 ? 'S' : 's', rand() < 0.4 ? 'S' : 's'],
     L: [rand() < 0.78 ? 'L' : 'l', rand() < 0.78 ? 'L' : 'l'],
     W: [rand() < 0.05 ? 'W' : 'w', rand() < 0.05 ? 'W' : 'w'],
+    C: [rand() < 0.12 ? 'cs' : 'C', rand() < 0.12 ? 'cs' : 'C'],   // colorpoint recessive (q≈0.12 → ~1.5-2% pointed)
     O: sex === 'M'
       ? [rand() < 0.3 ? 'O' : 'o']
       : [rand() < 0.3 ? 'O' : 'o', rand() < 0.3 ? 'O' : 'o'],
@@ -43,6 +44,7 @@ export function inheritGenes(mom, dad, kittenSex) {
     S: [maybeMutate(pickAllele(mg.S), ALLELE_POOLS.S), maybeMutate(pickAllele(dg.S), ALLELE_POOLS.S)],
     L: [maybeMutate(pickAllele(mg.L), ALLELE_POOLS.L), maybeMutate(pickAllele(dg.L), ALLELE_POOLS.L)],
     W: [maybeMutate(pickAllele(mg.W), ALLELE_POOLS.W), maybeMutate(pickAllele(dg.W), ALLELE_POOLS.W)],
+    C: [maybeMutate(pickAllele(mg.C || ['C','C']), ALLELE_POOLS.C), maybeMutate(pickAllele(dg.C || ['C','C']), ALLELE_POOLS.C)],
   };
   // O is X-linked. Mom contributes one of her two Os; dad's contribution depends on kitten sex.
   // Female kitten gets X from mom + X from dad → 2 alleles.
@@ -136,9 +138,17 @@ export function calculatePhenotype(genes, sex) {
   const orangeHex = isDilute ? '#e8c887' : '#c7733a';
   const orangeName = isDilute ? 'cream' : 'red';
 
-  // White spotting
+  // Deterministic per-cat jitter (stable across re-renders — derived from fixed
+  // gene values, NOT rand(), so the same cat always looks the same).
+  const jraw = (genes.size ?? 0.5) * 31.7 + (genes.boldness ?? 0.5) * 17.3 + (genes.appetite ?? 0.5) * 11.1;
+  const jit = jraw - Math.floor(jraw);   // 0..1
+
+  // GRADED WHITE SPOTTING — continuous locket→tuxedo→bicolor→van instead of 3 bins.
   const sCount = genes.S.filter(a => a === 'S').length;
-  const whiteAmount = sCount === 2 ? 0.55 : sCount === 1 ? 0.22 : 0;
+  let whiteAmount;
+  if (sCount === 0) whiteAmount = jit < 0.15 ? 0.05 : 0;       // occasional throat locket
+  else if (sCount === 1) whiteAmount = 0.15 + jit * 0.20;      // 0.15-0.35 tuxedo/bib
+  else whiteAmount = 0.45 + jit * 0.40;                        // 0.45-0.85 bicolor→van
 
   // Determine display name + hex
   let baseColor, baseHex, description;
@@ -146,7 +156,7 @@ export function calculatePhenotype(genes, sex) {
     baseColor = orangeName;
     baseHex = orangeHex;
   } else if (orangeMode === 'tortie') {
-    baseColor = whiteAmount > 0 ? 'calico' : 'tortie';
+    baseColor = whiteAmount > 0.1 ? 'calico' : 'tortie';
     baseHex = nonOrangeHex; // primary
   } else {
     baseColor = nonOrangeName;
@@ -163,11 +173,25 @@ export function calculatePhenotype(genes, sex) {
 
   const longHair = genes.L.every(a => a === 'l');
 
-  description = `${pattern === 'solid' ? '' : patternName(pattern) + ' '}${baseColor}${whiteAmount > 0 ? ' & white' : ''}${longHair ? ', longhair' : ''}`.trim();
+  // COLORPOINT (Siamese) — recessive cs/cs: pale body, dark extremities, blue eyes.
+  // The would-be coat color becomes the point color; body goes pale cream.
+  let pointed = false, pointHex = null;
+  if (genes.C && genes.C.every(a => a === 'cs')) {
+    pointed = true;
+    pointHex = baseHex;
+    baseHex = '#efe7da';
+    baseColor = 'colorpoint';
+    pattern = 'solid';
+  }
+
+  description = pointed
+    ? `colorpoint${longHair ? ', longhair' : ''}`
+    : `${pattern === 'solid' ? '' : patternName(pattern) + ' '}${baseColor}${whiteAmount > 0.1 ? ' & white' : ''}${longHair ? ', longhair' : ''}`.trim();
 
   return {
     baseColor, baseHex, pattern, whiteAmount, longHair,
     orangeMode, orangeHex, nonOrangeHex,
+    pointed, pointHex,
     description
   };
 }

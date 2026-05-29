@@ -63,5 +63,6 @@ export const ALLELE_POOLS = {
   T: ['Mc','Cs','Sp','Tk'],           // tabby pattern (random pick, codom in inheritance)
   S: ['S','s'],                       // white spotting (codominant)
   L: ['L','l'],                       // short > long
-  W: ['W','w']                        // white > non-white (W rare)
+  W: ['W','w'],                       // white > non-white (W rare)
+  C: ['C','cs']                       // full color > colorpoint (cs recessive — Siamese pattern + blue eyes)
 };

@@ -163,6 +163,9 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.baseHex = lightenHex(ph.baseHex, 0.5);
     ph.silver = true;
   }
+  // Polydactyly (~1.5%) — extra toes. Cosmetic tag; real and famously common in
+  // some feral lineages (e.g. Hemingway cats). Mildly heritable feel via F boost.
+  if (rand() < 0.015 * (1 + F * 2)) { rareTraits.push('polydactyl'); ph.polydactyl = true; }
   // Methuselah (~0.5%) — exceptional longevity, a rare gift independent of size.
   let methuselah = false;
   if (rand() < 0.005) { methuselah = true; rareTraits.push('methuselah'); }
