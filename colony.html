@@ -2237,6 +2237,36 @@ function endSimulation() {
   }));
 }
 
+// Filter the event timeline to only events that visibly moved the population,
+// and space them out, so long runs stay legible instead of a squished picket
+// fence. Returns the kept events with a `.delta` (population change) attached.
+function significantEvents(events, W) {
+  if (!events || !events.length) return [];
+  const hist = state.history || [];
+  if (hist.length < 2) return [];
+  const maxPop = Math.max(1, ...hist.map(h => h.pop));
+  const totalWeeks = state.simTime || 1;
+  const popAt = (wk) => {
+    let best = hist[0];
+    for (const h of hist) if (Math.abs(h.day - wk) < Math.abs(best.day - wk)) best = h;
+    return best.pop;
+  };
+  const scored = events.map(e => {
+    const delta = popAt(e.simTime + 9) - popAt(e.simTime - 3);   // change over the next ~2 seasons
+    return { ...e, delta, impact: Math.abs(delta) / maxPop };
+  }).filter(s => s.impact >= 0.07);   // ≥7% population swing = worth showing
+  scored.sort((a, b) => a.simTime - b.simTime);
+  const minGapWk = totalWeeks * (16 / Math.max(60, W));   // keep markers ≥16px apart
+  const kept = [];
+  for (const s of scored) {
+    const last = kept[kept.length - 1];
+    if (last && s.simTime - last.simTime < minGapWk) {
+      if (s.impact > last.impact) kept[kept.length - 1] = s;   // keep the bigger one
+    } else kept.push(s);
+  }
+  return kept;
+}
+
 function drawLineChart(canvasId, data, color, opts = {}) {
   const c = document.getElementById(canvasId);
   if (!c) return;
@@ -2278,8 +2308,9 @@ function drawLineChart(canvasId, data, color, opts = {}) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
 
-  // Event markers (drawn behind line)
-  const events = opts.events || [];
+  // Event markers (drawn behind line) — only those that moved the population,
+  // spaced out for legibility on long runs.
+  const events = significantEvents(opts.events || [], W);
   const eventColors = {
     harshWinter: '#4a6b8a',
     predator: '#8b4040',
@@ -2378,8 +2409,16 @@ function showChartTooltip(canvas, hitZone, clientX, clientY) {
   };
   const week = Math.floor(e.simTime);
   const year = Math.floor(e.simTime / 52) + 1;
+  // Population impact (computed in significantEvents)
+  let impactLine = '';
+  if (e.delta != null && e.delta !== 0) {
+    const dir = e.delta < 0 ? 'fell' : 'grew';
+    const arrow = e.delta < 0 ? '▼' : '▲';
+    impactLine = `<div class="ct-impact" style="color:${e.delta < 0 ? '#b3603e' : '#5b7048'}">${arrow} population ${dir} ${Math.abs(Math.round(e.delta))} after this</div>`;
+  }
   tip.innerHTML = `<div class="ct-title">${eventLabels[e.event] || e.event}</div>
     <div class="ct-when">Week ${week} · Year ${year} · ${e.season}</div>
+    ${impactLine}
     <div class="ct-msg">${e.message || ''}</div>`;
   tip.style.display = 'block';
   // Position above the click
