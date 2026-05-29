@@ -83,16 +83,20 @@ export function inheritGenes(mom, dad, kittenSex) {
 
 // Realistic iris color. No cat has black eyes; warm gold/copper/green/amber are
 // common, blue is special-cased to white/colorpoint cats only. Returns a hex.
+// DETERMINISTIC: keyed off a stable per-cat value (no rand()), so the setup-screen
+// preview and the in-sim render produce the EXACT same eye color for a given cat.
 export function deriveEyeColor(genes, ph) {
   // Colorpoint cats always have blue eyes
   if (ph.pointed) return '#9ccbe0';
-  // White / high-white cats: ~30% blue, else warm
+  // Stable hash from fixed gene values → 0..1 (same cat always lands the same)
+  const hraw = (genes.boldness ?? 0.5) * 53.1 + (genes.energy ?? 0.5) * 29.7 + (genes.size ?? 0.5) * 13.3 + (genes.appetite ?? 0.5) * 7.9;
+  const h = hraw - Math.floor(hraw);
+  // White / high-white cats: ~30% blue (deterministic slice), else warm
   const veryWhite = ph.baseColor === 'white' || (ph.whiteAmount != null && ph.whiteAmount >= 0.8);
-  if (veryWhite && rand() < 0.30) return '#bcdcee';
-  // Warm gradient by a hidden melanin roll. Orange/red coats bias coppery.
+  if (veryWhite && h < 0.30) return '#bcdcee';
+  // Warm gradient. Orange/red coats bias coppery (skew the lookup toward gold end).
   const orange = ph.orangeMode === 'full' || ph.baseColor === 'red' || ph.baseColor === 'cream';
-  let r = rand();
-  if (orange) r = r * 0.6 + 0.4;   // skew toward gold/copper end
+  let r = orange ? h * 0.6 + 0.4 : h;
   if (r < 0.30) return '#5fa45a';  // green
   if (r < 0.55) return '#d39b2c';  // amber/yellow
   if (r < 0.80) return '#7a4a1e';  // gold/copper
@@ -174,15 +178,24 @@ export function calculatePhenotype(genes, sex) {
   const longHair = genes.L.every(a => a === 'l');
 
   // COLORPOINT (Siamese) — recessive cs/cs: pale body, dark extremities, blue eyes.
-  // The would-be coat color becomes the point color; body goes pale cream.
+  // The points take ONE coherent color drawn from the cat's own pigment (so you
+  // never get e.g. a blue cat with clashing orange points): orange cats → red/
+  // cream points, everyone else → their dilute/dense base. Forced solid so there's
+  // no tortie split to clash.
   let pointed = false, pointHex = null;
   if (genes.C && genes.C.every(a => a === 'cs')) {
     pointed = true;
-    pointHex = baseHex;
+    pointHex = (orangeMode === 'full' || orangeMode === 'tortie') ? orangeHex : nonOrangeHex;
     baseHex = '#efe7da';
     baseColor = 'colorpoint';
     pattern = 'solid';
   }
+
+  // Build a draft phenotype, then derive deterministic eye color from it so the
+  // setup-screen preview and the in-sim render always match (eyes used to be
+  // rolled later in createCat — sim only — causing the picker mismatch).
+  const ph0 = { baseColor, whiteAmount, orangeMode, pointed };
+  const eyeHex = deriveEyeColor(genes, ph0);
 
   description = pointed
     ? `colorpoint${longHair ? ', longhair' : ''}`
@@ -192,6 +205,7 @@ export function calculatePhenotype(genes, sex) {
     baseColor, baseHex, pattern, whiteAmount, longHair,
     orangeMode, orangeHex, nonOrangeHex,
     pointed, pointHex,
+    eyeHex, eyeHex2: eyeHex,   // default: both eyes same; createCat overrides for heterochromia/albino
     description
   };
 }

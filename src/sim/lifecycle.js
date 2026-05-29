@@ -4,7 +4,7 @@ import {
   ESTRUS_CYCLE_WEEKS, NAME_POOL,
 } from './constants.js';
 import { rand, pick, gauss, clamp, lightenHex } from './util.js';
-import { calculatePhenotype, inheritGenes, deriveEyeColor } from './genetics.js';
+import { calculatePhenotype, inheritGenes } from './genetics.js';
 
 // The laggy per-cat floatTexts array was replaced by a single lightweight
 // cat.cue / cat.cueT (one transient icon, decays each tick, rendered in drawCat).
@@ -111,9 +111,8 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.baseHex = lightenHex(ph.baseHex, 0.32);
     ph.smokeUndertint = true;
   }
-  // ── EYES ── every cat gets a realistic base iris color (never black).
-  ph.eyeHex = deriveEyeColor(genes, ph);
-  ph.eyeHex2 = ph.eyeHex;   // second eye matches unless heterochromia below
+  // ── EYES ── base iris color is set deterministically in calculatePhenotype
+  // (so the picker preview matches). Here we only add the rare overrides.
   // Heterochromia — one genuinely different eye. Realistically near-exclusive to
   // white / high-white cats (odd-eyed cats are essentially always white/bicolor),
   // so gate the full blue eye to those; colored cats instead get a rare sectoral
