@@ -67,8 +67,12 @@ export function recordParents(sim, catId, parents) {
 
 // Build a new cat object (founder or kitten). Returns the cat — caller pushes
 // onto sim.cats and runs recordFirsts/recordParents.
-export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0 }) {
+// homeX/homeY = the cat's territorial home range (matrilineal clustering); defaults
+// to its spawn position when not supplied.
+export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0, homeX, homeY }) {
   const ph = calculatePhenotype(genes, sex);
+  const spawnX = x ?? rand(80, sim.arenaW - 80);
+  const spawnY = y ?? rand(160, sim.arenaH - 160);
   // Lifespan modified by inbreeding (computed at birth if has parents)
   const F = parents ? inbreedingCoefficient(sim, parents[0], parents[1]) : 0;
   const lifeMod = 1 - F * 0.4;        // up to 40% shorter life
@@ -148,8 +152,10 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     inbreedF: F,
     state: 'wander',
     stateTimer: 0,
-    x: x ?? rand(80, sim.arenaW - 80),
-    y: y ?? rand(160, sim.arenaH - 160),
+    x: spawnX,
+    y: spawnY,
+    homeX: homeX ?? spawnX,   // territorial home range (matrilineal clustering)
+    homeY: homeY ?? spawnY,
     vx: 0, vy: 0,
     dir: rand(0, Math.PI * 2),
     targetX: null, targetY: null,
@@ -295,12 +301,19 @@ export function giveBirth(sim, mom, sinks) {
       logEvent(`A kitten of ${mom.name} did not survive`, 'death');
       continue;
     }
+    // Kitten's home range = mother's, nudged slightly. Matrilines stay clustered
+    // but each generation drifts a little, so distinct family territories spread
+    // across the arena over time (territorial clustering of lineages).
+    const HOME_DRIFT = 28;
+    const kHomeX = clamp((mom.homeX ?? mom.x) + (rand() - 0.5) * 2 * HOME_DRIFT, 40, sim.arenaW - 40);
+    const kHomeY = clamp((mom.homeY ?? mom.y) + (rand() - 0.5) * 2 * HOME_DRIFT, 120, sim.arenaH - 40);
     const kitten = createCat(sim, {
       sex, genes: kgenes,
       name: pick(NAME_POOL),
       parents: [mom.id, father.id],
       x: mom.x + (rand() - 0.5) * 16,
       y: mom.y + (rand() - 0.5) * 16,
+      homeX: kHomeX, homeY: kHomeY,
     });
     sim.parentsById.set(kitten.id, [mom.id, father.id]);
     kitten.hunger = 0.85;

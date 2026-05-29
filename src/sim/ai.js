@@ -430,6 +430,20 @@ export function executeState(sim, cat, dt, sinks) {
       if (boldness < 0.35 && rand() < 0.01) {
         cat.vx *= 0.3; cat.vy *= 0.3;
       }
+      // TERRITORIAL HOME PULL — cats drift back toward their family's home range
+      // when they stray too far, so matrilines cluster into family territories
+      // (kittens inherit mom's home + drift). Bold cats range further; timid cats
+      // stay close. Food-seeking (a different state) still overrides this.
+      if (cat.homeX != null) {
+        const dxH = cat.homeX - cat.x, dyH = cat.homeY - cat.y;
+        const dH = Math.hypot(dxH, dyH) || 1;
+        const range = 55 + boldness * 90;        // tolerated roam radius from home
+        if (dH > range) {
+          const pull = 0.08 * (0.6 + (1 - boldness) * 0.8);
+          cat.vx += (dxH / dH) * pull;
+          cat.vy += (dyH / dH) * pull;
+        }
+      }
       // SPATIAL PERSONALITY BIASES — gentle drift based on traits
       if (boldness < 0.4) {
         const edgeForce = (0.4 - boldness) * 0.4;
