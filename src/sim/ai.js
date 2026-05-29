@@ -224,16 +224,18 @@ export function updateCat(sim, cat, dt, sinks) {
   for (const ft of cat.floatTexts) ft.t += dt;
   cat.floatTexts = cat.floatTexts.filter(ft => ft.t < ft.life);
 
-  // Needs decay (per sim-week)
-  // Hunger drain scales with body size — bigger cats burn more.
-  // Base lowered 0.030→0.022 so cats starve less readily (audit B2). The
-  // appetite term is softened (0.028→0.012) and body exponent 1.5→1.15: those
-  // constant per-tick food penalties used to overwhelm every episodic
-  // environment benefit, so appetite/body could ONLY shrink (audit B4). With a
-  // light constant cost, the conditional trade-offs (appetite good in plenty /
-  // bad in drought; body good in winter / bad in drought) drive direction, so
-  // both can now evolve up OR down by environment.
-  let hungerDrain = (0.024 + cat.genes.appetite * 0.026) * Math.pow(cat.bodyScale, 1.15);
+  // Needs decay (per sim-week). Body + appetite cost food, but CONDITIONALLY on
+  // scarcity (audit B4 / equal-opportunity-to-thrive): in abundance a big or
+  // hungry cat burns almost nothing extra (so giant/glutton colonies can THRIVE
+  // in good times), while in scarcity (drought/crowding) they burn heavily (so
+  // lean environments still shrink them and favor low appetite). This makes
+  // size + appetite both bidirectional AND lets their extremes be viable in the
+  // right environment, instead of a constant penalty that only ever shrinks them.
+  const foodPerCatNow = sim.food.length / Math.max(1, sim.cats.length);
+  const scarcity = clamp(1 - foodPerCatNow / 0.5, 0, 1);   // 0 = plenty, 1 = scarce
+  const appetiteCost = cat.genes.appetite * (0.008 + scarcity * 0.034);
+  const bodyExp = 1.0 + scarcity * 0.5;
+  let hungerDrain = (0.024 + appetiteCost) * Math.pow(cat.bodyScale, bodyExp);
   if (cat.stage === 'kitten') hungerDrain *= 0.35;
   if (cat.pregnantWith) hungerDrain *= 1.3;
   cat.hunger = clamp(cat.hunger - hungerDrain * dt, 0, 1);

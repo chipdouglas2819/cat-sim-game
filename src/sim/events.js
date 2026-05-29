@@ -176,14 +176,17 @@ export function applyEnvironmentalPressure(sim, cat, dt, { logEvent, triggerDeat
     }
   }
 
-  // ── PREDATOR ──  selects FOR aggression + body (defenders), AGAINST boldness.
-  // Defense (big + aggressive) is the dominant survival path so predator pushes
-  // aggression + size UP (audit B3/B4); small agility is a weaker secondary path.
+  // ── PREDATOR ──  selects boldness DOWN (reckless cats get caught), AGAINST
+  // big bodies slightly (small cats evade). Aggression's predator payoff is
+  // REPRODUCTIVE only (defends kittens — see giveBirth +0.9), deliberately NOT
+  // a self-survival rescue here: otherwise bold+aggressive cats survived and
+  // predators pushed boldness UP (audit follow-up — boldness/aggression were
+  // entangled and neither evolved cleanly). Now boldness falls, aggression
+  // rises via surviving litters — independently.
   else if (evt === 'predator') {
-    const exposureRisk = clamp((g.boldness - 0.3), 0, 0.7);
-    const defense = clamp(g.aggression - 0.3, 0, 0.7) * (0.5 + cat.bodyScale);  // big aggressive cats fight off
-    const agility = clamp((0.95 - cat.bodyScale), 0, 0.4) * 0.5;                // small cats dodge (secondary)
-    const netRisk = (exposureRisk - defense - agility) * 0.011 * dt * popScale;
+    const exposureRisk = clamp(g.boldness - 0.25, 0, 0.75);   // recklessness → caught
+    const agility = clamp(0.95 - cat.bodyScale, 0, 0.4) * 0.5; // small cats evade
+    const netRisk = (exposureRisk - agility) * 0.012 * dt * popScale;
     if (netRisk > 0 && rand() < netRisk) {
       logEvent(`${cat.name} was taken by a predator`, 'death');
       triggerDeath(cat, 'predator');
