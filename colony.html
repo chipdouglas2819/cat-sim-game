@@ -203,8 +203,29 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   transition: all 0.15s;
 }
 .btn-pill:active { background: var(--bg-deep); transform: scale(0.98); }
-.btn-pill.tiny { flex: 0 0 auto; width: 34px; padding: 6px 0; font-size: 16px; line-height: 1; }
-.appearance-btns { display: flex; gap: 6px; flex: 0 0 auto; }
+/* ── Appearance picker: tappable segmented pills ── */
+.look-row { margin-bottom: 10px; }
+.look-label { font-size: 12px; color: var(--ink-faint); margin-bottom: 4px; }
+.look-seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.look-pill {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  background: var(--paper-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 100px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all 0.12s;
+}
+.look-pill:active { transform: scale(0.96); }
+.look-pill.active {
+  background: var(--moss-deep);
+  border-color: var(--moss-deep);
+  color: var(--paper);
+  font-weight: 600;
+}
+.eye-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); display: inline-block; }
 .btn-pill.primary {
   background: var(--moss-deep);
   border-color: var(--moss-deep);
@@ -1261,14 +1282,27 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
   // tail (drawn first, behind body). Colorpoint cats have a dark point-colored tail.
   const extremityHex = ph.pointed && ph.pointHex ? ph.pointHex : ph.baseHex;
   const tailLen = (ph.longHair?16:13)*s;
-  ctx.strokeStyle = extremityHex;
-  ctx.lineWidth = (ph.longHair?5:3.5)*s;
-  ctx.lineCap = 'round';
   const tailWag = Math.sin(state.simTime*4 + cat.id) * 0.3;
-  ctx.beginPath();
-  ctx.moveTo(-12*s, 0);
-  ctx.quadraticCurveTo(-18*s, -3*s + tailWag*5, -14*s -tailLen*0.4, tailWag*8);
-  ctx.stroke();
+  const tailPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(-12*s, 0);
+    ctx.quadraticCurveTo(-18*s, -3*s + tailWag*5, -14*s -tailLen*0.4, tailWag*8);
+    ctx.stroke();
+  };
+  ctx.lineCap = 'round';
+  // Longhair: a soft wide fluff underlay along the tail (matches the body halo),
+  // then the solid tail on top — so a plush tail reads instead of a thin line.
+  if (ph.longHair && /^#[0-9a-fA-F]{6}$/.test(extremityHex)) {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = extremityHex;
+    ctx.lineWidth = 10*s;
+    tailPath();
+    ctx.restore();
+  }
+  ctx.strokeStyle = extremityHex;
+  ctx.lineWidth = (ph.longHair?6:3.5)*s;
+  tailPath();
 
   // body
   drawCoat(ctx, cat, s, fluff, pregBelly);
@@ -2732,56 +2766,78 @@ function refreshCard(key) {
   buildAppearancePicker(key, cat);
 }
 
-// Visible-trait choosers. Each entry: a label, the options, a getter (which
-// option index the current genes match) and a setter (mutate genes to option i).
-const APPEARANCE_TRAITS = [
-  { label: 'Color', options: ['White','Black','Blue','Chocolate','Lilac','Red','Cream','Tortie'],
-    set: (g, i, sex) => {
-      // White is dominant-W (masks all). Every other choice must CLEAR W or it'd
-      // stay white (a random W from rollGenes would otherwise override the pick).
-      if (i === 0) { g.W = ['W','w']; return; }
-      g.W = ['w','w'];
-      i -= 1;   // shift so 0..6 maps to the color list below
-      // B/D pick the four non-orange bases; O drives orange/tortie.
-      const setO = (on) => { g.O = sex === 'M' ? [on?'O':'o'] : (on==='tortie' ? ['O','o'] : [on?'O':'o', on?'O':'o']); };
-      if (i === 0) { g.B=['B','B']; g.D=['D','D']; setO(false); }       // black
-      else if (i === 1) { g.B=['B','B']; g.D=['d','d']; setO(false); }  // blue
-      else if (i === 2) { g.B=['b','b']; g.D=['D','D']; setO(false); }  // chocolate
-      else if (i === 3) { g.B=['b','b']; g.D=['d','d']; setO(false); }  // lilac
-      else if (i === 4) { g.D=['D','D']; setO(true); }                  // red
-      else if (i === 5) { g.D=['d','d']; setO(true); }                  // cream
-      else if (i === 6) { g.D=['D','D']; setO('tortie'); }              // tortie (F only)
-    },
-    get: (g, sex, ph) => {
-      if (g.W && g.W.includes('W')) return 0;   // white
-      if (ph.baseColor==='tortie'||ph.baseColor==='calico') return 7;
-      if (ph.orangeMode==='full') return ph.baseColor==='cream'?6:5;
-      return ({black:1,blue:2,chocolate:3,lilac:4}[ph.baseColor] ?? 1);
-    } },
-  { label: 'Pattern', options: ['Solid','Mackerel','Classic','Spotted','Ticked'],
-    set: (g, i) => { if (i===0){ g.A=['a','a']; } else { g.A=['A','A']; g.T=[['','Mc','Cs','Sp','Tk'][i], ['','Mc','Cs','Sp','Tk'][i]]; } },
-    get: (g, sex, ph) => ph.pattern==='solid'?0:({Mc:1,Cs:2,Sp:3,Tk:4}[ph.pattern]??0) },
-  { label: 'White', options: ['None','Some','Lots'],
-    set: (g, i) => { g.S = i===0?['s','s']: i===1?['S','s']:['S','S']; },
-    get: (g) => { const c=g.S.filter(a=>a==='S').length; return c; } },
-  { label: 'Fur', options: ['Short','Long'],
-    set: (g, i) => { g.L = i===0?['L','L']:['l','l']; },
-    get: (g) => g.L.every(a=>a==='l')?1:0 },
-  { label: 'Point', options: ['No','Colorpoint'],
-    set: (g, i) => { g.C = i===0?['C','C']:['cs','cs']; },
-    get: (g) => (g.C && g.C.every(a=>a==='cs'))?1:0 },
-  // Eyes: "Auto" clears the override (genetic default); the rest set genes.eyeOverride
-  // which deriveEyeColor respects. Hexes match the palette deriveEyeColor uses.
-  { label: 'Eyes', options: ['Auto','Gold','Copper','Green','Amber','Hazel','Blue'],
-    hexes: [null,'#e8d24a','#7a4a1e','#5fa45a','#d39b2c','#9fae5a','#bcdcee'],
-    set: (g, i) => { if (i===0) delete g.eyeOverride; else g.eyeOverride = APPEARANCE_TRAITS.find(t=>t.label==='Eyes').hexes[i]; },
-    get: (g) => { if (!g.eyeOverride) return 0; const hx=APPEARANCE_TRAITS.find(t=>t.label==='Eyes').hexes; const idx=hx.indexOf(g.eyeOverride); return idx>0?idx:0; } },
+// ── APPEARANCE MODEL ──────────────────────────────────────────
+// A `look` object is the SINGLE SOURCE OF TRUTH for a founder's appearance. The
+// UI sets look.<trait> directly (tap a pill), then applyLookToGenes writes the
+// visible alleles. No lossy get/set round-trip → no arrow desync, and every
+// option is always selectable (tortie auto-hidden for males). Behavioral genes
+// and eyeOverride are untouched here.
+const LOOK_TRAITS = [
+  { key: 'color', label: 'Color',
+    options: ['White','Black','Blue','Chocolate','Lilac','Red','Cream','Tortie'],
+    // 'Tortie' only applies to females; filtered in the UI by sex.
+  },
+  { key: 'pattern', label: 'Pattern', options: ['Solid','Mackerel','Classic','Spotted','Ticked'] },
+  { key: 'white', label: 'White', options: ['None','Some','Lots'] },
+  { key: 'fur', label: 'Fur', options: ['Short','Long'] },
+  { key: 'point', label: 'Point', options: ['No','Colorpoint'] },
+  { key: 'eyes', label: 'Eyes', options: ['Auto','Gold','Copper','Green','Amber','Hazel','Blue'] },
 ];
+const EYE_HEX = { Gold:'#e8d24a', Copper:'#7a4a1e', Green:'#5fa45a', Amber:'#d39b2c', Hazel:'#9fae5a', Blue:'#bcdcee' };
 
-// Redraw just the founder preview cat (no full card rebuild) and refresh its tags
-// + appearance labels in place — so cycling ‹ › is smooth and doesn't collapse
-// the open expander. Some traits interact (e.g. Colorpoint forces blue eyes), so
-// every appearance label is re-synced from the current genes.
+// Derive a look object from a freshly-rolled gene set (so 'Re-roll'/initial cats
+// show the right pills). Maps genes → the closest look option.
+function genesToLook(genes, sex) {
+  const ph = calculatePhenotype(genes, sex);
+  let color;
+  if (genes.W && genes.W.includes('W')) color = 'White';
+  else if (ph.baseColor === 'tortie' || ph.baseColor === 'calico') color = 'Tortie';
+  else if (ph.orangeMode === 'full') color = (ph.baseColor === 'cream') ? 'Cream' : 'Red';
+  else color = ({ black:'Black', blue:'Blue', chocolate:'Chocolate', lilac:'Lilac' }[ph.baseColor]) || 'Black';
+  const pattern = ph.pattern === 'solid' ? 'Solid' : ({ Mc:'Mackerel', Cs:'Classic', Sp:'Spotted', Tk:'Ticked' }[ph.pattern] || 'Solid');
+  const sCount = genes.S.filter(a => a === 'S').length;
+  const white = ['None','Some','Lots'][sCount];
+  const fur = genes.L.every(a => a === 'l') ? 'Long' : 'Short';
+  const point = (genes.C && genes.C.every(a => a === 'cs')) ? 'Colorpoint' : 'No';
+  let eyes = 'Auto';
+  if (genes.eyeOverride) { for (const k in EYE_HEX) if (EYE_HEX[k] === genes.eyeOverride) eyes = k; }
+  return { color, pattern, white, fur, point, eyes };
+}
+
+// Write a look object into the visible alleles of `genes` (in place).
+function applyLookToGenes(look, genes, sex) {
+  // Color
+  if (look.color === 'White') {
+    genes.W = ['W','w'];
+  } else {
+    genes.W = ['w','w'];
+    const setO = (mode) => { genes.O = sex === 'M' ? [mode==='on'?'O':'o'] : (mode==='tortie' ? ['O','o'] : [mode==='on'?'O':'o', mode==='on'?'O':'o']); };
+    switch (look.color) {
+      case 'Black':     genes.B=['B','B']; genes.D=['D','D']; setO('off'); break;
+      case 'Blue':      genes.B=['B','B']; genes.D=['d','d']; setO('off'); break;
+      case 'Chocolate': genes.B=['b','b']; genes.D=['D','D']; setO('off'); break;
+      case 'Lilac':     genes.B=['b','b']; genes.D=['d','d']; setO('off'); break;
+      case 'Red':       genes.D=['D','D']; setO('on'); break;
+      case 'Cream':     genes.D=['d','d']; setO('on'); break;
+      case 'Tortie':    genes.D=['D','D']; setO(sex==='M' ? 'on' : 'tortie'); break;  // males can't be tortie → red
+    }
+  }
+  // Pattern
+  if (look.pattern === 'Solid') { genes.A = ['a','a']; }
+  else { genes.A = ['A','A']; const t = { Mackerel:'Mc', Classic:'Cs', Spotted:'Sp', Ticked:'Tk' }[look.pattern]; genes.T = [t, t]; }
+  // White spotting
+  genes.S = { None:['s','s'], Some:['S','s'], Lots:['S','S'] }[look.white];
+  // Fur
+  genes.L = look.fur === 'Long' ? ['l','l'] : ['L','L'];
+  // Point
+  genes.C = look.point === 'Colorpoint' ? ['cs','cs'] : ['C','C'];
+  // Eyes (override or genetic default)
+  if (look.eyes === 'Auto') delete genes.eyeOverride;
+  else genes.eyeOverride = EYE_HEX[look.eyes];
+}
+
+// Redraw just the founder preview cat + tags (no full card rebuild) — used when a
+// pill is tapped, so the open expander doesn't collapse.
 function refreshStarterVisual(key, cat) {
   const ph = calculatePhenotype(cat.genes, cat.sex);
   const canvasEl = document.querySelector(`canvas[data-preview="${key}"]`);
@@ -2798,45 +2854,44 @@ function refreshStarterVisual(key, cat) {
       const span = document.createElement('span'); span.className = 'tag'; span.textContent = t; tagWrap.appendChild(span);
     }
   }
-  // re-sync every appearance label (traits can interact)
-  const wrap = document.querySelector(`[data-appearance="${key}"]`);
-  if (wrap) {
-    wrap.querySelectorAll('[data-appearance-trait]').forEach(row => {
-      const tr = APPEARANCE_TRAITS.find(t => t.label === row.dataset.appearanceTrait);
-      if (tr) row.querySelector('.val').textContent = tr.options[tr.get(cat.genes, cat.sex, ph)];
-    });
-  }
 }
 
+// Tappable segmented pill rows — tap the option you want (no arrows, no desync).
 function buildAppearancePicker(key, cat) {
   const wrap = document.querySelector(`[data-appearance="${key}"]`);
   if (!wrap) return;
+  if (!cat.look) cat.look = genesToLook(cat.genes, cat.sex);
   wrap.innerHTML = '';
-  for (const tr of APPEARANCE_TRAITS) {
-    const ph = calculatePhenotype(cat.genes, cat.sex);
-    const idx0 = tr.get(cat.genes, cat.sex, ph);
+  for (const tr of LOOK_TRAITS) {
+    // Tortie is female-only — hide it for males so every shown option is valid.
+    const opts = tr.options.filter(o => !(o === 'Tortie' && cat.sex === 'M'));
     const row = document.createElement('div');
-    row.className = 'slider-row';
-    row.dataset.appearanceTrait = tr.label;
+    row.className = 'look-row';
     const lbl = document.createElement('div');
-    lbl.className = 'slider-label';
-    const cycle = (dir) => {
-      const ph2 = calculatePhenotype(cat.genes, cat.sex);
-      const cur = tr.get(cat.genes, cat.sex, ph2);
-      const next = (cur + dir + tr.options.length) % tr.options.length;
-      tr.set(cat.genes, next, cat.sex);
-      refreshStarterVisual(key, cat);   // in-place — no card rebuild
-    };
-    lbl.innerHTML = `<span>${tr.label}</span><span class="val">${tr.options[idx0]}</span>`;
-    const btns = document.createElement('div');
-    btns.className = 'appearance-btns';
-    const prev = document.createElement('button'); prev.className='btn-pill tiny'; prev.textContent='‹';
-    const next = document.createElement('button'); next.className='btn-pill tiny'; next.textContent='›';
-    prev.addEventListener('click', () => cycle(-1));
-    next.addEventListener('click', () => cycle(1));
-    btns.appendChild(prev); btns.appendChild(next);
+    lbl.className = 'look-label';
+    lbl.textContent = tr.label;
+    const seg = document.createElement('div');
+    seg.className = 'look-seg';
+    for (const opt of opts) {
+      const pill = document.createElement('button');
+      pill.className = 'look-pill' + (cat.look[tr.key] === opt ? ' active' : '');
+      pill.textContent = opt;
+      // Eye pills get a color dot
+      if (tr.key === 'eyes' && EYE_HEX[opt]) {
+        const dot = document.createElement('span'); dot.className = 'eye-dot'; dot.style.background = EYE_HEX[opt];
+        pill.prepend(dot);
+      }
+      pill.addEventListener('click', () => {
+        cat.look[tr.key] = opt;
+        applyLookToGenes(cat.look, cat.genes, cat.sex);
+        // update active state on this row's pills
+        seg.querySelectorAll('.look-pill').forEach(p => p.classList.toggle('active', p === pill));
+        refreshStarterVisual(key, cat);
+      });
+      seg.appendChild(pill);
+    }
     row.appendChild(lbl);
-    row.appendChild(btns);
+    row.appendChild(seg);
     wrap.appendChild(row);
   }
 }
@@ -2856,7 +2911,9 @@ document.addEventListener('click', (e) => {
     const sex = cur.sex;
     const newg = rollGenes(sex);
     // keep behavioral, replace visible
-    for (const v of ['B','D','A','T','S','L','W','O']) cur.genes[v] = newg[v];
+    for (const v of ['B','D','A','T','S','L','W','C','O']) cur.genes[v] = newg[v];
+    delete cur.genes.eyeOverride;
+    cur.look = null;   // re-derive pills from the new look
     refreshCard(k);
     return;
   }
