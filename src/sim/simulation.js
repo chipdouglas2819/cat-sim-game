@@ -228,6 +228,7 @@ export class Simulation {
       this.logEvent(`Year ${newYear} begins.`, 'event');
       if (this.driftWeatherEnabled) driftWeather(this);
       this._narrateDrift();
+      this._maybeMigrant();
     }
 
     // Tally how long each event type is active (for bench environment correlation)
@@ -365,6 +366,32 @@ export class Simulation {
       shifts.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
       this.logEvent(`These cats are becoming ${shifts[0].phrase} than their forebears.`, 'event');
     }
+  }
+
+  // Immigration — a stray cat occasionally wanders in with FRESH random genes and
+  // its own home range at the arena edge. This is the realistic diversity injector
+  // (feral colonies avoid genetic collapse via immigration): it counteracts drift
+  // and inbreeding, and starts a new lineage territory. Called once per year.
+  _maybeMigrant() {
+    const pop = this.livingCount();
+    if (pop < 3 || pop > 220) return;        // only into an established, non-crowded colony
+    if (rand() > 0.28) return;               // ~once every 3-4 years on average
+    const sex = rand() < 0.5 ? 'M' : 'F';
+    const edge = Math.floor(rand() * 4);     // enter + settle at a random edge
+    let x, y;
+    if (edge === 0) { x = 45; y = rand(140, this.arenaH - 45); }
+    else if (edge === 1) { x = this.arenaW - 45; y = rand(140, this.arenaH - 45); }
+    else if (edge === 2) { x = rand(45, this.arenaW - 45); y = 140; }
+    else { x = rand(45, this.arenaW - 45); y = this.arenaH - 45; }
+    const m = createCat(this, {
+      sex, genes: rollGenes(sex),
+      age: 40 + Math.floor(rand() * 60),
+      x, y, homeX: x, homeY: y,
+    });
+    m._gen = this.generation;                // joins at the colony's current generation
+    this.cats.push(m);
+    recordFirsts(this, m);
+    this.logEvent(`A stray ${sex === 'F' ? 'female' : 'male'} joins the colony.`, 'event');
   }
 
   // Count living (non-dying) cats. A run is biologically over at <= 1

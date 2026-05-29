@@ -108,16 +108,22 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.smokeUndertint = true;
   }
   // Heterochromia — different eye colors (~1.5%)
-  if (rand() < 0.015) rareTraits.push('odd-eyed');
+  if (rand() < 0.015 * (1 + F * 3)) rareTraits.push('odd-eyed');
   // ── SUPER-RARE VARIANTS ── striking, low-probability phenotypes for interest
   // and visible diversity. Coat overrides render via ph.baseHex.
-  if (rand() < 0.006 && !ph.smoke) {           // melanistic (~0.6%) — solid inky black
+  // Albinism/melanism are RECESSIVE in real cats: inbreeding (high F) makes a cat
+  // far likelier to inherit the trait from both sides, so inbred lineages surface
+  // these striking variants. recBoost scales the odds up to ~3.4× at max F — the
+  // visible upside of inbreeding (the downside is shorter life + stillbirths,
+  // applied via F above).
+  const recBoost = 1 + F * 4;
+  if (rand() < 0.006 * recBoost && !ph.smoke) {       // melanistic — solid inky black
     rareTraits.push('melanistic');
     ph.baseColor = 'melanistic';
     ph.baseHex = '#16161c';
     ph.pattern = 'solid';
     ph.melanistic = true;
-  } else if (rand() < 0.004) {                 // albino (~0.4%) — white coat, pink-red eyes
+  } else if (rand() < 0.004 * recBoost) {             // albino — white coat, pink-red eyes
     rareTraits.push('albino');
     ph.baseColor = 'albino';
     ph.baseHex = '#f7f1ea';
@@ -125,7 +131,7 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.whiteAmount = 1;
     ph.albino = true;
     if (!rareTraits.includes('odd-eyed')) rareTraits.push('odd-eyed');
-  } else if (rand() < 0.005) {                 // silver/chinchilla shimmer (~0.5%)
+  } else if (rand() < 0.005 * recBoost) {             // silver/chinchilla shimmer
     rareTraits.push('silver');
     ph.baseHex = lightenHex(ph.baseHex, 0.5);
     ph.silver = true;
