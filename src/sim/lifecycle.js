@@ -4,7 +4,7 @@ import {
   ESTRUS_CYCLE_WEEKS, NAME_POOL,
 } from './constants.js';
 import { rand, pick, gauss, clamp, lightenHex } from './util.js';
-import { calculatePhenotype, inheritGenes } from './genetics.js';
+import { calculatePhenotype, inheritGenes, deriveEyeColor } from './genetics.js';
 
 // The per-cat floating pop-up comment system was removed (laggy, low value —
 // meaningful events go to the top-of-screen log). cat.floatTexts is a shared
@@ -116,8 +116,23 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.baseHex = lightenHex(ph.baseHex, 0.32);
     ph.smokeUndertint = true;
   }
-  // Heterochromia — different eye colors (~1.5%)
-  if (rand() < 0.015 * (1 + F * 3)) rareTraits.push('odd-eyed');
+  // ── EYES ── every cat gets a realistic base iris color (never black).
+  ph.eyeHex = deriveEyeColor(genes, ph);
+  ph.eyeHex2 = ph.eyeHex;   // second eye matches unless heterochromia below
+  // Heterochromia — one genuinely different eye. Realistically near-exclusive to
+  // white / high-white cats (odd-eyed cats are essentially always white/bicolor),
+  // so gate the full blue eye to those; colored cats instead get a rare sectoral
+  // fleck (so you never see a blue-eyed solid black cat). Inbreeding boosts it.
+  if (rand() < 0.015 * (1 + F * 3)) {
+    const whiteish = ph.baseColor === 'white' || (ph.whiteAmount != null && ph.whiteAmount > 0.5);
+    if (whiteish) {
+      rareTraits.push('odd-eyed');
+      ph.eyeHex2 = '#bcdcee';   // one ice-blue eye
+    } else {
+      rareTraits.push('sectoral');
+      ph.eyeSectoral = true;    // a flecked iris (rendered as a small accent), both eyes same base
+    }
+  }
   // ── SUPER-RARE VARIANTS ── striking, low-probability phenotypes for interest
   // and visible diversity. Coat overrides render via ph.baseHex.
   // Albinism/melanism are RECESSIVE in real cats: inbreeding (high F) makes a cat
@@ -139,7 +154,10 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     ph.pattern = 'solid';
     ph.whiteAmount = 1;
     ph.albino = true;
-    if (!rareTraits.includes('odd-eyed')) rareTraits.push('odd-eyed');
+    // True albinos have pink-red eyes (both) — not heterochromia. Override both.
+    ph.eyeHex = '#d98a96';
+    ph.eyeHex2 = '#d98a96';
+    ph.eyeSectoral = false;
   } else if (rand() < 0.005 * recBoost) {             // silver/chinchilla shimmer
     rareTraits.push('silver');
     ph.baseHex = lightenHex(ph.baseHex, 0.5);

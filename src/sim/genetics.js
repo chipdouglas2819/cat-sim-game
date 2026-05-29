@@ -79,6 +79,25 @@ export function inheritGenes(mom, dad, kittenSex) {
   return g;
 }
 
+// Realistic iris color. No cat has black eyes; warm gold/copper/green/amber are
+// common, blue is special-cased to white/colorpoint cats only. Returns a hex.
+export function deriveEyeColor(genes, ph) {
+  // Colorpoint cats always have blue eyes
+  if (ph.pointed) return '#9ccbe0';
+  // White / high-white cats: ~30% blue, else warm
+  const veryWhite = ph.baseColor === 'white' || (ph.whiteAmount != null && ph.whiteAmount >= 0.8);
+  if (veryWhite && rand() < 0.30) return '#bcdcee';
+  // Warm gradient by a hidden melanin roll. Orange/red coats bias coppery.
+  const orange = ph.orangeMode === 'full' || ph.baseColor === 'red' || ph.baseColor === 'cream';
+  let r = rand();
+  if (orange) r = r * 0.6 + 0.4;   // skew toward gold/copper end
+  if (r < 0.30) return '#5fa45a';  // green
+  if (r < 0.55) return '#d39b2c';  // amber/yellow
+  if (r < 0.80) return '#7a4a1e';  // gold/copper
+  if (r < 0.95) return '#9fae5a';  // hazel
+  return '#e8d24a';                // pale yellow
+}
+
 // Display name for a tabby pattern allele.
 export function patternName(p) {
   return { Mc: 'mackerel tabby', Cs: 'classic tabby', Sp: 'spotted tabby', Tk: 'ticked tabby', solid: 'solid' }[p] || '';
