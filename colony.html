@@ -2215,6 +2215,9 @@ function endSimulation() {
   if (f._classic) firstsRows.push({ label: 'First classic tabby', name: f._classic.name, detail: `week ${f._classic.day}` });
   if (f._spotted) firstsRows.push({ label: 'First spotted tabby', name: f._spotted.name, detail: `week ${f._spotted.day}` });
 
+  // Do any events actually cost cats? (drives whether to show the marker hint)
+  const hasTollEvents = (state.eventTimeline || []).some(e => (e.toll || 0) >= 2);
+
   const c = document.getElementById('endContent');
   c.innerHTML = `
     <div class="end-title">The colony has ended.</div>
@@ -2235,16 +2238,16 @@ function endSimulation() {
     <div class="chart-wrap">
       <div class="chart-title">Population over time</div>
       <canvas id="popChart"></canvas>
-      ${state.eventTimeline.length > 0 ? '<div class="chart-hint">Tap a marker to see what happened.</div>' : ''}
+      ${hasTollEvents ? '<div class="chart-hint">Marks show events that cost cats — tap one for its toll.</div>' : ''}
     </div>
 
     <div class="chart-wrap">
-      <div class="chart-title">Genetic diversity (heterozygosity)</div>
+      <div class="chart-title">Genetic diversity</div>
       <canvas id="divChart"></canvas>
     </div>
 
     <div class="chart-wrap">
-      <div class="chart-title">Behavioral gene drift</div>
+      <div class="chart-title">Gene drift (traits + size)</div>
       <canvas id="geneChart"></canvas>
     </div>
 
