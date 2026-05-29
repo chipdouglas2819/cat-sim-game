@@ -1348,11 +1348,13 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
       ctx.ellipse(headR*0.45, ey, eyeRx*0.5, eyeRy, 0, 0, Math.PI*2);
       ctx.fill();
     }
-    // vertical slit pupil (cat eye) — thin ellipse, taller than wide
+    // slit pupil (cat eye). The cat's local +x is the nose→tail axis, so a real
+    // cat's vertical slit projects ALONG that axis from top-down — elongate in x,
+    // thin in y (was reversed, which read as a horizontal goat slit).
     if (s > 0.5 && eyeOpen > 0.4) {
       ctx.fillStyle = 'rgba(18,14,10,0.92)';
       ctx.beginPath();
-      ctx.ellipse(headR*0.45, ey, eyeRx*0.32, eyeRy*0.85, 0, 0, Math.PI*2);
+      ctx.ellipse(headR*0.45, ey, eyeRx*0.78, eyeRy*0.30, 0, 0, Math.PI*2);
       ctx.fill();
     }
   };
@@ -1440,14 +1442,38 @@ function drawCoat(ctx, cat, s, fluff, pregBelly=1) {
   // LOD: skip detailed pattern overlays when there are many cats (cheap rendering pass)
   const simplifyPatterns = state.cats.length > 400;
 
-  // Longhair fluff — drawn FIRST so it sits behind the body, flush against it (no gap)
+  // Longhair fluff — a SOFT fur halo that fades at the edges, plus a few gentle
+  // tufts, so it reads as fur instead of a hard bold ring. Drawn FIRST (behind
+  // the body). Radial gradient: solid-ish near the body → transparent at the tips.
   if (ph.longHair) {
     ctx.save();
-    ctx.fillStyle = ph.baseHex;
-    ctx.globalAlpha = 0.55;
+    const fr = bodyW * 1.32;   // halo reach along the long axis
+    // transparent version of the coat color — only the #rrggbb form supports the
+    // +'00' alpha suffix; fall back to a transparent rgba if it's not a 6-hex.
+    const furHex = (/^#[0-9a-fA-F]{6}$/.test(ph.baseHex)) ? ph.baseHex : '#999999';
+    const grad = ctx.createRadialGradient(0, 0, bodyH * 0.7, 0, 0, fr);
+    grad.addColorStop(0, furHex);
+    grad.addColorStop(0.55, furHex);
+    grad.addColorStop(1, furHex + '00');   // fade to transparent (8-digit hex)
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = 0.6;
+    // Slightly irregular halo (a touch taller than wide, like a ruff)
     ctx.beginPath();
-    ctx.ellipse(0, 0, bodyW*1.18, bodyH*1.28, 0, 0, Math.PI*2);
+    ctx.ellipse(0, 0, fr, bodyH * 1.42, 0, 0, Math.PI * 2);
     ctx.fill();
+    // A few soft tufts around the rim for texture (deterministic per cat)
+    const seed = cat.id * 2654435761;
+    const rr = (n) => { const v = Math.sin(seed + n * 78.233) * 43758.5453; return v - Math.floor(v); };
+    const tufts = state.cats.length > 400 ? 0 : 6;
+    for (let i = 0; i < tufts; i++) {
+      const ang = (i / tufts) * Math.PI * 2 + rr(i) * 0.5;
+      const tx = Math.cos(ang) * bodyW * 1.05;
+      const ty = Math.sin(ang) * bodyH * 1.1;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.ellipse(tx, ty, bodyW * 0.22, bodyH * 0.26, ang, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
     ctx.restore();
   }
