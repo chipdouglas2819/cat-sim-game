@@ -226,6 +226,17 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   font-weight: 600;
 }
 .eye-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); display: inline-block; }
+/* ── Cat presets ── */
+.preset-list { margin: 4px 0 8px; display: flex; flex-direction: column; gap: 5px; }
+.preset-empty { font-size: 12px; color: var(--ink-faint); font-style: italic; padding: 2px 0; }
+.preset-item { display: flex; gap: 6px; align-items: stretch; }
+.preset-load { flex: 1; text-align: left; }
+.preset-del {
+  flex: 0 0 auto; width: 34px; border-radius: 100px;
+  background: var(--paper-soft); border: 1px solid var(--border-soft);
+  color: var(--rose); font-size: 13px;
+}
+.preset-del:active { background: var(--bg-deep); }
 .btn-pill.primary {
   background: var(--moss-deep);
   border-color: var(--moss-deep);
@@ -1043,7 +1054,13 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="cat-actions">
           <button class="btn-pill" data-reroll="A">Re-roll</button>
           <button class="btn-pill" data-reroll-look="A">Random look</button>
+          <button class="btn-pill" data-reroll-traits="A">Random traits</button>
         </div>
+        <div class="cat-actions">
+          <button class="btn-pill" data-save-preset="A">★ Save cat</button>
+          <button class="btn-pill" data-open-presets="A">Load saved…</button>
+        </div>
+        <div class="preset-list" data-presets="A" hidden></div>
         <div class="expander" data-expander="A">
           <button class="expander-toggle">Appearance</button>
           <div class="expander-body" data-appearance="A"></div>
@@ -1066,7 +1083,13 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="cat-actions">
           <button class="btn-pill" data-reroll="B">Re-roll</button>
           <button class="btn-pill" data-reroll-look="B">Random look</button>
+          <button class="btn-pill" data-reroll-traits="B">Random traits</button>
         </div>
+        <div class="cat-actions">
+          <button class="btn-pill" data-save-preset="B">★ Save cat</button>
+          <button class="btn-pill" data-open-presets="B">Load saved…</button>
+        </div>
+        <div class="preset-list" data-presets="B" hidden></div>
         <div class="expander" data-expander="B">
           <button class="expander-toggle">Appearance</button>
           <div class="expander-body" data-appearance="B"></div>
@@ -1583,25 +1606,35 @@ function drawCoat(ctx, cat, s, fluff, pregBelly=1) {
     ctx.restore();
   }
 
-  // white spotting overlay
-  if (ph.whiteAmount > 0) {
+  // White spotting — NAMED patterns. The body's local frame: +x is the front
+  // (toward the head/nose), -x is the rear/tail; +y/-y are the two flanks. Paws
+  // are drawn near the front-and-rear lower edges.
+  const wp = ph.whitePattern || (ph.whiteAmount > 0.4 ? 'bicolor' : ph.whiteAmount > 0 ? 'tuxedo' : 'solid');
+  if (wp !== 'solid') {
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
     ctx.clip();
     ctx.fillStyle = '#f3ecd5';
-    if (ph.whiteAmount > 0.4) {
-      // High — mostly white
-      ctx.fillRect(-bodyW*1.2, -bodyH*0.2, bodyW*2.4, bodyH*1.4);
-    } else {
-      // Belly white
-      ctx.beginPath();
-      ctx.ellipse(0, bodyH*0.5, bodyW*0.7, bodyH*0.5, 0, 0, Math.PI*2);
-      ctx.fill();
-      // chest spot
-      ctx.beginPath();
-      ctx.ellipse(bodyW*0.5, bodyH*0.3, bodyW*0.25, bodyH*0.3, 0, 0, Math.PI*2);
-      ctx.fill();
+    const chest = () => { ctx.beginPath(); ctx.ellipse(bodyW*0.55, 0, bodyW*0.26, bodyH*0.42, 0, 0, Math.PI*2); ctx.fill(); };
+    const paws = () => { // four white paw-tips near the lower body edges
+      for (const px of [bodyW*0.6, -bodyW*0.55]) for (const py of [bodyH*0.72, -bodyH*0.72]) {
+        ctx.beginPath(); ctx.ellipse(px, py, bodyW*0.16, bodyH*0.24, 0, 0, Math.PI*2); ctx.fill();
+      }
+    };
+    const belly = () => { ctx.beginPath(); ctx.ellipse(bodyW*0.1, bodyH*0.45, bodyW*0.85, bodyH*0.6, 0, 0, Math.PI*2); ctx.fill(); };
+    if (wp === 'locket') {
+      chest();
+    } else if (wp === 'mitted') {
+      paws(); chest();
+    } else if (wp === 'tuxedo') {
+      belly(); chest(); paws();   // classic tuxedo: white chest/belly/paws, colored "jacket"
+    } else if (wp === 'bicolor') {
+      // ~half white: front + underside white, colored cap over the back/rear
+      ctx.fillRect(-bodyW*1.2, -bodyH*1.2, bodyW*2.0, bodyH*2.4);
+    } else if (wp === 'van') {
+      // mostly white — only the rear keeps color (head/tail color drawn elsewhere)
+      ctx.fillRect(-bodyW*1.2, -bodyH*1.2, bodyW*2.3, bodyH*2.4);
     }
     ctx.restore();
   }
@@ -2703,6 +2736,36 @@ function initSetup() {
   refreshCard('B');
 }
 
+// ─── CAT PRESETS (localStorage) ───────────────────────────────
+// Save a whole founder (look + personality + name) so a player can always reload
+// their cat. Stored as a small array under one key. Genes carry whitePattern/
+// eyeOverride/behavioral values, so a loaded cat looks AND acts as saved (the
+// player can then hit 'Random traits' to keep the look but reroll personality).
+function getPresets() {
+  try { return JSON.parse(localStorage.getItem('colony_presets') || '[]'); } catch { return []; }
+}
+function savePreset(name, cat) {
+  const presets = getPresets();
+  presets.push({ name, sex: cat.sex, genes: { ...cat.genes }, savedAt: Date.now() });
+  if (presets.length > 24) presets.shift();   // cap
+  localStorage.setItem('colony_presets', JSON.stringify(presets));
+}
+function renderPresetList(key) {
+  const list = document.querySelector(`[data-presets="${key}"]`);
+  if (!list) return;
+  const presets = getPresets();
+  if (!presets.length) { list.innerHTML = '<div class="preset-empty">No saved cats yet. Tap ★ Save cat.</div>'; return; }
+  list.innerHTML = '';
+  presets.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'preset-item';
+    const sexMark = p.sex === 'M' ? '♂' : '♀';
+    row.innerHTML = `<button class="preset-load btn-pill" data-load-preset="${i}" data-slot="${key}">${sexMark} ${(p.name||'cat').replace(/[<>&]/g,'')}</button>`
+      + `<button class="preset-del" data-del-preset="${i}" data-slot="${key}" title="Delete">✕</button>`;
+    list.appendChild(row);
+  });
+}
+
 function refreshCard(key) {
   const cat = state.starter[key];
   const ph = calculatePhenotype(cat.genes, cat.sex);
@@ -2778,7 +2841,7 @@ const LOOK_TRAITS = [
     // 'Tortie' only applies to females; filtered in the UI by sex.
   },
   { key: 'pattern', label: 'Pattern', options: ['Solid','Mackerel','Classic','Spotted','Ticked'] },
-  { key: 'white', label: 'White', options: ['None','Some','Lots'] },
+  { key: 'white', label: 'White', options: ['Solid','Locket','Mitted','Tuxedo','Bicolor','Van'] },
   { key: 'fur', label: 'Fur', options: ['Short','Long'] },
   { key: 'point', label: 'Point', options: ['No','Colorpoint'] },
   { key: 'eyes', label: 'Eyes', options: ['Auto','Gold','Copper','Green','Amber','Hazel','Blue'] },
@@ -2795,8 +2858,9 @@ function genesToLook(genes, sex) {
   else if (ph.orangeMode === 'full') color = (ph.baseColor === 'cream') ? 'Cream' : 'Red';
   else color = ({ black:'Black', blue:'Blue', chocolate:'Chocolate', lilac:'Lilac' }[ph.baseColor]) || 'Black';
   const pattern = ph.pattern === 'solid' ? 'Solid' : ({ Mc:'Mackerel', Cs:'Classic', Sp:'Spotted', Tk:'Ticked' }[ph.pattern] || 'Solid');
-  const sCount = genes.S.filter(a => a === 'S').length;
-  const white = ['None','Some','Lots'][sCount];
+  // Named white pattern (capitalize the phenotype's whitePattern)
+  const wpName = { solid:'Solid', locket:'Locket', mitted:'Mitted', tuxedo:'Tuxedo', bicolor:'Bicolor', van:'Van' };
+  const white = wpName[ph.whitePattern] || 'Solid';
   const fur = genes.L.every(a => a === 'l') ? 'Long' : 'Short';
   const point = (genes.C && genes.C.every(a => a === 'cs')) ? 'Colorpoint' : 'No';
   let eyes = 'Auto';
@@ -2825,8 +2889,16 @@ function applyLookToGenes(look, genes, sex) {
   // Pattern
   if (look.pattern === 'Solid') { genes.A = ['a','a']; }
   else { genes.A = ['A','A']; const t = { Mackerel:'Mc', Classic:'Cs', Spotted:'Sp', Ticked:'Tk' }[look.pattern]; genes.T = [t, t]; }
-  // White spotting
-  genes.S = { None:['s','s'], Some:['S','s'], Lots:['S','S'] }[look.white];
+  // White: store the explicit named pattern (genes.whitePattern overrides the
+  // S-count derivation in calculatePhenotype) and set S to a matching amount so
+  // any S-based logic stays sane.
+  const wpLower = (look.white || 'Solid').toLowerCase();
+  if (wpLower === 'solid') { delete genes.whitePattern; genes.S = ['s','s']; }
+  else {
+    genes.whitePattern = wpLower;
+    genes.S = (wpLower === 'bicolor' || wpLower === 'van') ? ['S','S']
+            : (wpLower === 'locket') ? ['s','s'] : ['S','s'];
+  }
   // Fur
   genes.L = look.fur === 'Long' ? ['l','l'] : ['L','L'];
   // Point
@@ -2913,8 +2985,70 @@ document.addEventListener('click', (e) => {
     // keep behavioral, replace visible
     for (const v of ['B','D','A','T','S','L','W','C','O']) cur.genes[v] = newg[v];
     delete cur.genes.eyeOverride;
+    delete cur.genes.whitePattern;   // let the new roll derive its own white pattern
     cur.look = null;   // re-derive pills from the new look
     refreshCard(k);
+    return;
+  }
+  // Random traits — re-roll ONLY behavioral genes, keep the appearance/look.
+  const rerollTraits = e.target.closest('[data-reroll-traits]');
+  if (rerollTraits) {
+    const k = rerollTraits.dataset.rerollTraits;
+    const cur = state.starter[k];
+    const newg = rollGenes(cur.sex);
+    for (const t of ['boldness','sociability','playfulness','aggression','energy','appetite','size']) cur.genes[t] = newg[t];
+    refreshCard(k);
+    return;
+  }
+  // Save the current founder as a named preset (full cat: look + personality + name).
+  const saveP = e.target.closest('[data-save-preset]');
+  if (saveP) {
+    const k = saveP.dataset.savePreset;
+    const cur = state.starter[k];
+    const nm = (cur.name || 'My cat').slice(0, 24);
+    savePreset(nm, { sex: cur.sex, genes: cur.genes, name: cur.name });
+    const list = document.querySelector(`[data-presets="${k}"]`);
+    list.hidden = false;
+    renderPresetList(k);
+    return;
+  }
+  // Toggle the saved-cats list for this slot.
+  const openP = e.target.closest('[data-open-presets]');
+  if (openP) {
+    const k = openP.dataset.openPresets;
+    const list = document.querySelector(`[data-presets="${k}"]`);
+    list.hidden = !list.hidden;
+    if (!list.hidden) renderPresetList(k);
+    return;
+  }
+  // Load a preset into this slot.
+  const loadP = e.target.closest('[data-load-preset]');
+  if (loadP) {
+    const k = loadP.dataset.slot;
+    const idx = +loadP.dataset.loadPreset;
+    const presets = getPresets();
+    const p = presets[idx];
+    if (p) {
+      const slotSex = state.starter[k].sex;   // keep the slot's sex (A=male, B=female)
+      const genes = { ...p.genes };
+      // Fix X-linked O allele count if the preset's sex differs from the slot.
+      if (slotSex === 'M' && genes.O && genes.O.length === 2) genes.O = [genes.O[0]];
+      else if (slotSex === 'F' && genes.O && genes.O.length === 1) genes.O = [genes.O[0], genes.O[0]];
+      state.starter[k] = { sex: slotSex, genes, name: p.name, look: null };
+      refreshCard(k);
+    }
+    return;
+  }
+  // Delete a preset.
+  const delP = e.target.closest('[data-del-preset]');
+  if (delP) {
+    e.stopPropagation();
+    const k = delP.dataset.slot;
+    const idx = +delP.dataset.delPreset;
+    const presets = getPresets();
+    presets.splice(idx, 1);
+    localStorage.setItem('colony_presets', JSON.stringify(presets));
+    renderPresetList(k);
     return;
   }
   const expBtn = e.target.closest('.expander-toggle');

@@ -116,11 +116,16 @@ export function patternName(p) {
 export function calculatePhenotype(genes, sex) {
   // Dominant white masks everything else
   const hasW = genes.W.includes('W');
-  if (hasW) return {
-    baseColor: 'white', baseHex: '#f0e9d2',
-    pattern: 'solid', whiteAmount: 1, longHair: genes.L.every(a => a === 'l'),
-    description: 'all white'
-  };
+  if (hasW) {
+    const wph = {
+      baseColor: 'white', baseHex: '#f0e9d2',
+      pattern: 'solid', whiteAmount: 1, whitePattern: 'solid', longHair: genes.L.every(a => a === 'l'),
+      description: 'all white'
+    };
+    wph.eyeHex = deriveEyeColor(genes, wph);
+    wph.eyeHex2 = wph.eyeHex;
+    return wph;
+  }
 
   // Orange expression (X-linked)
   let orangeMode;
@@ -150,12 +155,23 @@ export function calculatePhenotype(genes, sex) {
   const jraw = (genes.size ?? 0.5) * 31.7 + (genes.boldness ?? 0.5) * 17.3 + (genes.appetite ?? 0.5) * 11.1;
   const jit = jraw - Math.floor(jraw);   // 0..1
 
-  // GRADED WHITE SPOTTING — continuous locket→tuxedo→bicolor→van instead of 3 bins.
+  // WHITE SPOTTING as NAMED PATTERNS (people recognize their cat by these).
+  // S-allele count sets the natural range; deterministic jitter picks within it.
+  // An explicit genes.whitePattern (set by the appearance picker) overrides.
   const sCount = genes.S.filter(a => a === 'S').length;
-  let whiteAmount;
-  if (sCount === 0) whiteAmount = jit < 0.15 ? 0.05 : 0;       // occasional throat locket
-  else if (sCount === 1) whiteAmount = 0.15 + jit * 0.20;      // 0.15-0.35 tuxedo/bib
-  else whiteAmount = 0.45 + jit * 0.40;                        // 0.45-0.85 bicolor→van
+  let whitePattern;
+  if (genes.whitePattern) {
+    whitePattern = genes.whitePattern;
+  } else if (sCount === 0) {
+    whitePattern = jit < 0.18 ? 'locket' : 'solid';                 // none, or a tiny chest locket
+  } else if (sCount === 1) {
+    whitePattern = jit < 0.4 ? 'mitted' : (jit < 0.8 ? 'tuxedo' : 'bicolor');
+  } else {
+    whitePattern = jit < 0.55 ? 'bicolor' : 'van';                  // lots of white
+  }
+  // Derived coverage 0..1 for the blue-eye gate + any amount-based logic.
+  const WHITE_AMOUNT = { solid: 0, locket: 0.06, mitted: 0.2, tuxedo: 0.34, bicolor: 0.55, van: 0.82 };
+  const whiteAmount = WHITE_AMOUNT[whitePattern] ?? 0;
 
   // Determine display name + hex
   let baseColor, baseHex, description;
@@ -200,12 +216,13 @@ export function calculatePhenotype(genes, sex) {
   const ph0 = { baseColor, whiteAmount, orangeMode, pointed };
   const eyeHex = deriveEyeColor(genes, ph0);
 
+  const whiteName = { locket: ' with a locket', mitted: ' mitted', tuxedo: ' tuxedo', bicolor: ' & white', van: ' van' };
   description = pointed
     ? `colorpoint${longHair ? ', longhair' : ''}`
-    : `${pattern === 'solid' ? '' : patternName(pattern) + ' '}${baseColor}${whiteAmount > 0.1 ? ' & white' : ''}${longHair ? ', longhair' : ''}`.trim();
+    : `${pattern === 'solid' ? '' : patternName(pattern) + ' '}${baseColor}${whitePattern !== 'solid' ? (whiteName[whitePattern] || ' & white') : ''}${longHair ? ', longhair' : ''}`.trim();
 
   return {
-    baseColor, baseHex, pattern, whiteAmount, longHair,
+    baseColor, baseHex, pattern, whiteAmount, whitePattern, longHair,
     orangeMode, orangeHex, nonOrangeHex,
     pointed, pointHex,
     eyeHex, eyeHex2: eyeHex,   // default: both eyes same; createCat overrides for heterochromia/albino
