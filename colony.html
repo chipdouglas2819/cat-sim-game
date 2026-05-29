@@ -2467,6 +2467,7 @@ function drawGeneDriftChart(canvasId) {
     {name:'aggro',   key:'aggression',  color:'#c47a6e'},
     {name:'energy',  key:'energy',      color:'#4a6b8a'},
     {name:'appetite',key:'appetite',    color:'#7a5a3a'},
+    {name:'size',    key:'bodyScale',   color:'#2b3328', norm:true},  // phenotype ~0.45-1.6, normalized to fit
   ];
   const dpr = window.devicePixelRatio || 1;
   let W = Math.floor(c.getBoundingClientRect().width);
