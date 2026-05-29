@@ -6,6 +6,12 @@ import {
 import { rand, pick, gauss, clamp, lightenHex } from './util.js';
 import { calculatePhenotype, inheritGenes } from './genetics.js';
 
+// The per-cat floating pop-up comment system was removed (laggy, low value —
+// meaningful events go to the top-of-screen log instead). cat.floatTexts is a
+// shared no-op sink so the scattered .push() calls cost nothing and nothing
+// renders. Render + decay loops were deleted.
+const FLOAT_SINK = { push() {} };
+
 // Map age (weeks) to life stage.
 export function ageStage(age) {
   if (age < KITTEN_DAYS) return 'kitten';
@@ -175,7 +181,7 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     dying: false,
     dyingT: 0,
     dyingReason: '',
-    floatTexts: [],              // {text, t, life, dy}
+    floatTexts: FLOAT_SINK,      // removed pop-up system — no-op sink
     bornFlash: 0.6,              // sparkle effect on birth
     fightGlow: 0,                // flares red when fighting
     fightCount: 0,               // total fights initiated/joined (for end screen)

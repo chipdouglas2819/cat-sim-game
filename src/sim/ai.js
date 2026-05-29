@@ -225,9 +225,8 @@ export function updateCat(sim, cat, dt, sinks) {
     }
   }
 
-  // float texts decay
-  for (const ft of cat.floatTexts) ft.t += dt;
-  cat.floatTexts = cat.floatTexts.filter(ft => ft.t < ft.life);
+  // (floatText decay loop removed — the pop-up system is gone; cat.floatTexts is
+  // a no-op sink, so there's nothing to age or filter)
 
   // Needs decay (per sim-week). Body + appetite cost food, but CONDITIONALLY on
   // scarcity (audit B4 / equal-opportunity-to-thrive): in abundance a big or

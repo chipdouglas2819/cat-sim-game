@@ -1189,8 +1189,10 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
   const s = scale * kittenScale * bScale * condShrink;
   // Long hair adds visual width
   const fluff = (ph.longHair ? 1.18 : 1) * (0.95 + condition*0.05);
-  // Senior cats dim slightly (last 25% of life)
-  const seniorFade = cat.stage === 'senior' ? clamp(1 - (cat.age - SENIOR_END * 0.75) / (cat.lifespan * 0.25), 0.7, 1) : 1;
+  // Senior cats dim very slightly (a subtle age cue). Floor raised 0.7→0.88 —
+  // 0.7 made every old cat look 30% translucent (and methuselah cats stay senior
+  // a long time), which read as a rendering bug.
+  const seniorFade = cat.stage === 'senior' ? clamp(1 - (cat.age - SENIOR_END * 0.75) / (cat.lifespan * 0.25), 0.88, 1) : 1;
   // Pregnant belly extra width factor — grows over the 10 days
   const pregBelly = cat.pregnantWith ? (1 + (1 - cat.pregnantWith.daysLeft/PREGNANCY_DAYS) * 0.45) : 1;
 
