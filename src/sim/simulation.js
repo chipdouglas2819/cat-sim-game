@@ -143,14 +143,16 @@ export class Simulation {
         y: this.arenaH / 2 + Math.sin(ang) * radius + (rand() - 0.5) * 30,
       });
     }
+    // keepLook: respect the player's chosen founder appearance (skip the random
+    // coat-overriding rare rolls). Only when genes were actually supplied.
     const A = createCat(this, {
       sex: 'M', genes: aGenes || rollGenes('M'), name: aName,
-      age: 50, x: this.arenaW * 0.4, y: this.arenaH * 0.5,
+      age: 50, x: this.arenaW * 0.4, y: this.arenaH * 0.5, keepLook: !!aGenes,
     });
     A._gen = 1;
     const B = createCat(this, {
       sex: 'F', genes: bGenes || rollGenes('F'), name: bName,
-      age: 50, x: this.arenaW * 0.6, y: this.arenaH * 0.5,
+      age: 50, x: this.arenaW * 0.6, y: this.arenaH * 0.5, keepLook: !!bGenes,
     });
     B._gen = 1;
     const founders = [A, B];

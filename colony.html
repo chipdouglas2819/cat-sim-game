@@ -203,6 +203,8 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   transition: all 0.15s;
 }
 .btn-pill:active { background: var(--bg-deep); transform: scale(0.98); }
+.btn-pill.tiny { flex: 0 0 auto; width: 34px; padding: 6px 0; font-size: 16px; line-height: 1; }
+.appearance-btns { display: flex; gap: 6px; flex: 0 0 auto; }
 .btn-pill.primary {
   background: var(--moss-deep);
   border-color: var(--moss-deep);
@@ -1019,7 +1021,11 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="tag-row" data-tags="A"></div>
         <div class="cat-actions">
           <button class="btn-pill" data-reroll="A">Re-roll</button>
-          <button class="btn-pill" data-reroll-look="A">Look only</button>
+          <button class="btn-pill" data-reroll-look="A">Random look</button>
+        </div>
+        <div class="expander" data-expander="A">
+          <button class="expander-toggle">Appearance</button>
+          <div class="expander-body" data-appearance="A"></div>
         </div>
         <div class="expander" data-expander="A">
           <button class="expander-toggle">Personality</button>
@@ -1038,7 +1044,11 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="tag-row" data-tags="B"></div>
         <div class="cat-actions">
           <button class="btn-pill" data-reroll="B">Re-roll</button>
-          <button class="btn-pill" data-reroll-look="B">Look only</button>
+          <button class="btn-pill" data-reroll-look="B">Random look</button>
+        </div>
+        <div class="expander" data-expander="B">
+          <button class="expander-toggle">Appearance</button>
+          <div class="expander-body" data-appearance="B"></div>
         </div>
         <div class="expander" data-expander="B">
           <button class="expander-toggle">Personality</button>
@@ -2698,6 +2708,82 @@ function refreshCard(key) {
     row.appendChild(lbl);
     row.appendChild(inp);
     sliderWrap.appendChild(row);
+  }
+
+  // ── APPEARANCE PICKER ── cycle-able choosers for each visible trait, so the
+  // player can DESIGN a founder's look (not just reroll). Each option sets the
+  // underlying alleles to achieve that phenotype, then redraws the preview.
+  buildAppearancePicker(key, cat);
+}
+
+// Visible-trait choosers. Each entry: a label, the options, a getter (which
+// option index the current genes match) and a setter (mutate genes to option i).
+const APPEARANCE_TRAITS = [
+  { label: 'Color', options: ['White','Black','Blue','Chocolate','Lilac','Red','Cream','Tortie'],
+    set: (g, i, sex) => {
+      // White is dominant-W (masks all). Every other choice must CLEAR W or it'd
+      // stay white (a random W from rollGenes would otherwise override the pick).
+      if (i === 0) { g.W = ['W','w']; return; }
+      g.W = ['w','w'];
+      i -= 1;   // shift so 0..6 maps to the color list below
+      // B/D pick the four non-orange bases; O drives orange/tortie.
+      const setO = (on) => { g.O = sex === 'M' ? [on?'O':'o'] : (on==='tortie' ? ['O','o'] : [on?'O':'o', on?'O':'o']); };
+      if (i === 0) { g.B=['B','B']; g.D=['D','D']; setO(false); }       // black
+      else if (i === 1) { g.B=['B','B']; g.D=['d','d']; setO(false); }  // blue
+      else if (i === 2) { g.B=['b','b']; g.D=['D','D']; setO(false); }  // chocolate
+      else if (i === 3) { g.B=['b','b']; g.D=['d','d']; setO(false); }  // lilac
+      else if (i === 4) { g.D=['D','D']; setO(true); }                  // red
+      else if (i === 5) { g.D=['d','d']; setO(true); }                  // cream
+      else if (i === 6) { g.D=['D','D']; setO('tortie'); }              // tortie (F only)
+    },
+    get: (g, sex, ph) => {
+      if (g.W && g.W.includes('W')) return 0;   // white
+      if (ph.baseColor==='tortie'||ph.baseColor==='calico') return 7;
+      if (ph.orangeMode==='full') return ph.baseColor==='cream'?6:5;
+      return ({black:1,blue:2,chocolate:3,lilac:4}[ph.baseColor] ?? 1);
+    } },
+  { label: 'Pattern', options: ['Solid','Mackerel','Classic','Spotted','Ticked'],
+    set: (g, i) => { if (i===0){ g.A=['a','a']; } else { g.A=['A','A']; g.T=[['','Mc','Cs','Sp','Tk'][i], ['','Mc','Cs','Sp','Tk'][i]]; } },
+    get: (g, sex, ph) => ph.pattern==='solid'?0:({Mc:1,Cs:2,Sp:3,Tk:4}[ph.pattern]??0) },
+  { label: 'White', options: ['None','Some','Lots'],
+    set: (g, i) => { g.S = i===0?['s','s']: i===1?['S','s']:['S','S']; },
+    get: (g) => { const c=g.S.filter(a=>a==='S').length; return c; } },
+  { label: 'Fur', options: ['Short','Long'],
+    set: (g, i) => { g.L = i===0?['L','L']:['l','l']; },
+    get: (g) => g.L.every(a=>a==='l')?1:0 },
+  { label: 'Point', options: ['No','Colorpoint'],
+    set: (g, i) => { g.C = i===0?['C','C']:['cs','cs']; },
+    get: (g) => (g.C && g.C.every(a=>a==='cs'))?1:0 },
+];
+
+function buildAppearancePicker(key, cat) {
+  const wrap = document.querySelector(`[data-appearance="${key}"]`);
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const tr of APPEARANCE_TRAITS) {
+    const ph = calculatePhenotype(cat.genes, cat.sex);
+    let idx = tr.get(cat.genes, cat.sex, ph);
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'slider-label';
+    const cycle = (dir) => {
+      idx = (idx + dir + tr.options.length) % tr.options.length;
+      tr.set(cat.genes, idx, cat.sex);
+      lbl.querySelector('.val').textContent = tr.options[idx];
+      refreshCard(key);   // full redraw — re-reads everything, keeps tags/preview in sync
+    };
+    lbl.innerHTML = `<span>${tr.label}</span><span class="val">${tr.options[idx]}</span>`;
+    const btns = document.createElement('div');
+    btns.className = 'appearance-btns';
+    const prev = document.createElement('button'); prev.className='btn-pill tiny'; prev.textContent='‹';
+    const next = document.createElement('button'); next.className='btn-pill tiny'; next.textContent='›';
+    prev.addEventListener('click', () => cycle(-1));
+    next.addEventListener('click', () => cycle(1));
+    btns.appendChild(prev); btns.appendChild(next);
+    row.appendChild(lbl);
+    row.appendChild(btns);
+    wrap.appendChild(row);
   }
 }
 

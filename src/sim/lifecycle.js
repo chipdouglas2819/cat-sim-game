@@ -73,7 +73,7 @@ export function recordParents(sim, catId, parents) {
 // onto sim.cats and runs recordFirsts/recordParents.
 // homeX/homeY = the cat's territorial home range (matrilineal clustering); defaults
 // to its spawn position when not supplied.
-export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0, homeX, homeY }) {
+export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0, homeX, homeY, keepLook = false }) {
   const ph = calculatePhenotype(genes, sex);
   const spawnX = x ?? rand(80, sim.arenaW - 80);
   const spawnY = y ?? rand(160, sim.arenaH - 160);
@@ -105,7 +105,8 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     rareTraits.push('giant');
   }
   // Smoke (~2%) — coat has silvery wash. Modifies phenotype.
-  if (rand() < 0.02 && ph.baseColor !== 'white') {
+  // keepLook (founders with a player-chosen appearance) skips coat-overriding rolls.
+  if (!keepLook && rand() < 0.02 && ph.baseColor !== 'white') {
     rareTraits.push('smoke');
     ph.smoke = true;
     ph.baseHex = lightenHex(ph.baseHex, 0.32);
@@ -135,27 +136,29 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
   // visible upside of inbreeding (the downside is shorter life + stillbirths,
   // applied via F above).
   const recBoost = 1 + F * 4;
-  if (rand() < 0.006 * recBoost && !ph.smoke) {       // melanistic — solid inky black
-    rareTraits.push('melanistic');
-    ph.baseColor = 'melanistic';
-    ph.baseHex = '#16161c';
-    ph.pattern = 'solid';
-    ph.melanistic = true;
-  } else if (rand() < 0.004 * recBoost) {             // albino — white coat, pink-red eyes
-    rareTraits.push('albino');
-    ph.baseColor = 'albino';
-    ph.baseHex = '#f7f1ea';
-    ph.pattern = 'solid';
-    ph.whiteAmount = 1;
-    ph.albino = true;
-    // True albinos have pink-red eyes (both) — not heterochromia. Override both.
-    ph.eyeHex = '#d98a96';
-    ph.eyeHex2 = '#d98a96';
-    ph.eyeSectoral = false;
-  } else if (rand() < 0.005 * recBoost) {             // silver/chinchilla shimmer
-    rareTraits.push('silver');
-    ph.baseHex = lightenHex(ph.baseHex, 0.5);
-    ph.silver = true;
+  if (!keepLook) {
+    if (rand() < 0.006 * recBoost && !ph.smoke) {       // melanistic — solid inky black
+      rareTraits.push('melanistic');
+      ph.baseColor = 'melanistic';
+      ph.baseHex = '#16161c';
+      ph.pattern = 'solid';
+      ph.melanistic = true;
+    } else if (rand() < 0.004 * recBoost) {             // albino — white coat, pink-red eyes
+      rareTraits.push('albino');
+      ph.baseColor = 'albino';
+      ph.baseHex = '#f7f1ea';
+      ph.pattern = 'solid';
+      ph.whiteAmount = 1;
+      ph.albino = true;
+      // True albinos have pink-red eyes (both) — not heterochromia. Override both.
+      ph.eyeHex = '#d98a96';
+      ph.eyeHex2 = '#d98a96';
+      ph.eyeSectoral = false;
+    } else if (rand() < 0.005 * recBoost) {             // silver/chinchilla shimmer
+      rareTraits.push('silver');
+      ph.baseHex = lightenHex(ph.baseHex, 0.5);
+      ph.silver = true;
+    }
   }
   // Polydactyly (~1.5%) — extra toes. Cosmetic tag; real and famously common in
   // some feral lineages (e.g. Hemingway cats). Mildly heritable feel via F boost.
