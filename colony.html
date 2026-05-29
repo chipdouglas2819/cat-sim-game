@@ -1137,21 +1137,29 @@ const parentsById = sim.parentsById;
 function computeTraitTint(cat) {
   if (cat.stage === 'kitten') return null;
   const g = cat.genes;
+  // Tint relative to the FOUNDER baseline (fixed, captured at colony start) — not
+  // a fixed 0.5 and not the moving colony mean. So: (a) as the colony drifts from
+  // its founders the whole field visibly shifts color = you SEE evolution; (b) an
+  // individual cat that differs from the founding stock stands out. The reference
+  // is stable, so it's not a "moving target." Falls back to 0.5 pre-founding.
+  const ref = (state.founderGenes) || {};
+  const r = (k) => (ref[k] != null ? ref[k] : 0.5);
   const traits = [
-    { val: g.aggression - 0.5,  hex: [195, 70, 40] },     // aggressive → warm red
-    { val: g.boldness - 0.5,    hex: [205, 130, 50] },    // bold → orange
-    { val: g.energy - 0.5,      hex: [220, 195, 70] },    // energetic → yellow
-    { val: g.sociability - 0.5, hex: [110, 175, 110] },   // social → green
-    { val: g.playfulness - 0.5, hex: [175, 125, 200] },   // playful → violet
+    { val: g.aggression - r('aggression'),  hex: [195, 70, 40] },   // aggressive → warm red
+    { val: g.boldness - r('boldness'),       hex: [205, 130, 50] },  // bold → orange
+    { val: g.energy - r('energy'),           hex: [220, 195, 70] },  // energetic → yellow
+    { val: g.sociability - r('sociability'), hex: [110, 175, 110] }, // social → green
+    { val: g.playfulness - r('playfulness'), hex: [175, 125, 200] },// playful → violet
   ];
-  let strongest = null, strongestAbs = 0.12;   // lower threshold — more cats tint
+  let strongest = null, strongestAbs = 0.06;   // low threshold — show variation + drift
   for (const t of traits) {
     if (Math.abs(t.val) > strongestAbs) { strongestAbs = Math.abs(t.val); strongest = t; }
   }
   if (!strongest) return null;
-  // Amount: scales with how far from 0.5 the trait is. Up to ~0.45 at extreme.
-  const amount = Math.min(0.45, (strongestAbs - 0.10) * 1.2);
-  // Negative direction → cool blue tint (timid, aloof, mellow)
+  // Amount scales with deviation from the founder baseline. Stronger than before
+  // so drift is clearly visible.
+  const amount = Math.min(0.5, (strongestAbs - 0.04) * 1.6);
+  // Below the founder baseline → cool blue tint (timid, aloof, mellow, gentler)
   const tintHex = strongest.val > 0 ? strongest.hex : [85, 125, 165];
   return { rgb: tintHex, amount };
 }
@@ -2656,11 +2664,10 @@ function beginSim() {
   state.deceased = [];
   state.deathCauses = {};
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
-  // Lower carrying capacity (was 1) → smaller colonies (~40-80 cats depending on
-  // screen) where genetic drift is actually visible. At 1 the colony grew to
-  // hundreds and evolution froze (large-N resistance). This is the key dial for
-  // "witness evolution" vs "stable colony" — see COLONY_AUDIT bench findings.
-  state.colonyScale = 0.4;
+  // Carrying capacity → colonies stabilize around ~100 cats (soft cap). Drift
+  // stays visible at this size via the founder-relative trait tint (the whole
+  // field shifts color as the colony evolves) rather than needing a tiny pop.
+  state.colonyScale = 0.7;
 
   // resize canvas (sets sim.arenaW/H before founders are placed)
   canvas = document.getElementById('arena');

@@ -52,8 +52,10 @@ export function inheritGenes(mom, dad, kittenSex) {
   } else {
     g.O = [maybeMutate(pickAllele(mg.O), ['O', 'o'])];
   }
-  // Behavioral — midparent + drift. Low σ for realistic heritability so selection compounds.
-  const blend = (k) => clamp(((mg[k] + dg[k]) / 2) + gauss() * 0.025, 0.02, 0.98);
+  // Behavioral — midparent + drift. σ raised 0.025→0.045 so kittens vary more
+  // visibly from their parents (each litter has a real spread of personalities),
+  // while still heritable enough that selection compounds over generations.
+  const blend = (k) => clamp(((mg[k] + dg[k]) / 2) + gauss() * 0.045, 0.02, 0.98);
   g.boldness = blend('boldness');
   g.sociability = blend('sociability');
   g.playfulness = blend('playfulness');
@@ -61,6 +63,19 @@ export function inheritGenes(mom, dad, kittenSex) {
   g.energy = blend('energy');
   g.appetite = blend('appetite');
   g.size = blend('size');
+  // "SPORT" kittens (~9%): one or two traits take a larger jump from the
+  // midparent — a noticeably different personality in the litter (not a freak,
+  // just an outlier). This keeps real variation in the population to see + select
+  // on, instead of everyone converging to the colony mean.
+  if (rand() < 0.09) {
+    const keys = ['boldness', 'sociability', 'playfulness', 'aggression', 'energy', 'appetite', 'size'];
+    const nJump = rand() < 0.35 ? 2 : 1;
+    for (let j = 0; j < nJump; j++) {
+      const k = pick(keys);
+      g[k] = clamp(g[k] + gauss() * 0.18, 0.02, 0.98);
+    }
+    g._sport = true;   // flag for a possible visual cue
+  }
   return g;
 }
 

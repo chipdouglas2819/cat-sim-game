@@ -105,6 +105,30 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
   }
   // Heterochromia — different eye colors (~1.5%)
   if (rand() < 0.015) rareTraits.push('odd-eyed');
+  // ── SUPER-RARE VARIANTS ── striking, low-probability phenotypes for interest
+  // and visible diversity. Coat overrides render via ph.baseHex.
+  if (rand() < 0.006 && !ph.smoke) {           // melanistic (~0.6%) — solid inky black
+    rareTraits.push('melanistic');
+    ph.baseColor = 'melanistic';
+    ph.baseHex = '#16161c';
+    ph.pattern = 'solid';
+    ph.melanistic = true;
+  } else if (rand() < 0.004) {                 // albino (~0.4%) — white coat, pink-red eyes
+    rareTraits.push('albino');
+    ph.baseColor = 'albino';
+    ph.baseHex = '#f7f1ea';
+    ph.pattern = 'solid';
+    ph.whiteAmount = 1;
+    ph.albino = true;
+    if (!rareTraits.includes('odd-eyed')) rareTraits.push('odd-eyed');
+  } else if (rand() < 0.005) {                 // silver/chinchilla shimmer (~0.5%)
+    rareTraits.push('silver');
+    ph.baseHex = lightenHex(ph.baseHex, 0.5);
+    ph.silver = true;
+  }
+  // Methuselah (~0.5%) — exceptional longevity, a rare gift independent of size.
+  let methuselah = false;
+  if (rand() < 0.005) { methuselah = true; rareTraits.push('methuselah'); }
   return {
     id: sim.nextId++,
     name: name || pick(NAME_POOL),
@@ -120,7 +144,7 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     condition: 0.85,
     bodyScale,
     bornAt: sim.simTime - age,
-    lifespan: lifespanFinal,
+    lifespan: lifespanFinal * (methuselah ? 1.7 : 1),
     inbreedF: F,
     state: 'wander',
     stateTimer: 0,
