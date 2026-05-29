@@ -68,6 +68,10 @@ for (let i = 0; i < seeds; i++) {
     meanInbreedingF: round(final.meanInbreedingF),
     diversity: round(final.diversity),
     deathCauses: final.deathCauses,
+    meanLifespan: round(final.meanLifespan),
+    totalDeaths: final.totalDeaths,
+    eventExposure: roundObj(final.eventExposure),
+    peakPop: trajectory.reduce((m, p) => Math.max(m, p.pop), 0),
     trajectory,
   });
 

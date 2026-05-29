@@ -74,6 +74,8 @@ export class Simulation {
     this.notableEvents = [];
     this.deceased = [];                    // snapshots of every cat who died (capped — see triggerDeath)
     this.deathCauses = {};                 // running histogram: reason → count
+    this.lifespanSum = 0;                  // Σ age-at-death (sim-weeks) — for mean lifespan
+    this.lifespanCount = 0;
     this.eventExposure = {};               // sim-weeks each event type was active (for bench correlation)
     this.founders = [];                    // ids of the starting pair
     this.founderGenes = null;              // captured at start for drift comparison
@@ -411,6 +413,8 @@ export class Simulation {
       climate: this.climate ? { ...this.climate } : null,
       deathCauses: { ...this.deathCauses },
       eventExposure: { ...this.eventExposure },
+      meanLifespan: this.lifespanCount ? this.lifespanSum / this.lifespanCount : null,
+      totalDeaths: this.lifespanCount,
       founderGenes: this.founderGenes ? { ...this.founderGenes } : null,
     };
   }
