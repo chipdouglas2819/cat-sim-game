@@ -2257,37 +2257,29 @@ function endSimulation() {
   setTimeout(() => { document.getElementById('end').scrollTop = 0; }, 0);
   // Render charts after layout settles (two rAFs to be safe)
   requestAnimationFrame(() => requestAnimationFrame(() => {
+    // Event markers only on the population chart (where toll is meaningful) —
+    // they were noise on the diversity chart, which barely moves at those points.
     drawLineChart('popChart', state.history.map(h=>h.pop), '#5b7048', { events: state.eventTimeline });
-    drawLineChart('divChart', state.diversityHistory, '#b3603e', { events: state.eventTimeline });
+    drawLineChart('divChart', state.diversityHistory, '#b3603e');
     drawGeneDriftChart('geneChart');
   }));
 }
 
-// Filter the event timeline to only events that visibly moved the population,
-// and space them out, so long runs stay legible instead of a squished picket
-// fence. Returns the kept events with a `.delta` (population change) attached.
+// Keep only events that actually mattered — harmful events that cost real cats
+// (toll, attributed accurately in the sim) or seasons of plenty — and space them
+// out so long runs stay legible. Uses the true death toll, not a misleading
+// population-window delta (which conflated events with natural growth).
 function significantEvents(events, W) {
   if (!events || !events.length) return [];
-  const hist = state.history || [];
-  if (hist.length < 2) return [];
-  const maxPop = Math.max(1, ...hist.map(h => h.pop));
   const totalWeeks = state.simTime || 1;
-  const popAt = (wk) => {
-    let best = hist[0];
-    for (const h of hist) if (Math.abs(h.day - wk) < Math.abs(best.day - wk)) best = h;
-    return best.pop;
-  };
-  const scored = events.map(e => {
-    const delta = popAt(e.simTime + 9) - popAt(e.simTime - 3);   // change over the next ~2 seasons
-    return { ...e, delta, impact: Math.abs(delta) / maxPop };
-  }).filter(s => s.impact >= 0.07);   // ≥7% population swing = worth showing
-  scored.sort((a, b) => a.simTime - b.simTime);
+  const sig = events.filter(e => (e.toll || 0) >= 2 || e.event === 'plentiful');
+  sig.sort((a, b) => a.simTime - b.simTime);
   const minGapWk = totalWeeks * (16 / Math.max(60, W));   // keep markers ≥16px apart
   const kept = [];
-  for (const s of scored) {
+  for (const s of sig) {
     const last = kept[kept.length - 1];
     if (last && s.simTime - last.simTime < minGapWk) {
-      if (s.impact > last.impact) kept[kept.length - 1] = s;   // keep the bigger one
+      if ((s.toll || 0) > (last.toll || 0)) kept[kept.length - 1] = s;   // deadlier one wins the slot
     } else kept.push(s);
   }
   return kept;
@@ -2435,12 +2427,12 @@ function showChartTooltip(canvas, hitZone, clientX, clientY) {
   };
   const week = Math.floor(e.simTime);
   const year = Math.floor(e.simTime / 52) + 1;
-  // Population impact (computed in significantEvents)
+  // Accurate impact: deaths this event actually caused (toll), or abundance.
   let impactLine = '';
-  if (e.delta != null && e.delta !== 0) {
-    const dir = e.delta < 0 ? 'fell' : 'grew';
-    const arrow = e.delta < 0 ? '▼' : '▲';
-    impactLine = `<div class="ct-impact" style="color:${e.delta < 0 ? '#b3603e' : '#5b7048'}">${arrow} population ${dir} ${Math.abs(Math.round(e.delta))} after this</div>`;
+  if (e.event === 'plentiful') {
+    impactLine = `<div class="ct-impact" style="color:#5b7048">▲ a season of plenty</div>`;
+  } else if (e.toll > 0) {
+    impactLine = `<div class="ct-impact" style="color:#b3603e">✕ ${e.toll} cat${e.toll !== 1 ? 's' : ''} lost to it</div>`;
   }
   tip.innerHTML = `<div class="ct-title">${eventLabels[e.event] || e.event}</div>
     <div class="ct-when">Week ${week} · Year ${year} · ${e.season}</div>
@@ -2573,6 +2565,7 @@ function restart() {
   state.activeEventMessage = '';
   state.eventLog = [];
   state.eventTimeline = [];
+  state._eventEntry = null;
   state.climate = makeStartingWeather();
   state.simTime = 0;
   state.totalBorn = 2;
@@ -2727,6 +2720,7 @@ function beginSim() {
   state.activeEventMessage = '';
   state.eventLog = [];
   state.eventTimeline = [];
+  state._eventEntry = null;
   state.climate = makeStartingWeather();
   state.deceased = [];
   state.deathCauses = {};

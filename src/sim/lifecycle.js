@@ -411,6 +411,17 @@ export function triggerDeath(sim, cat, reason, { logEvent }) {
   if (!r.biggest      || snapshot.bodyScale  > r.biggest.bodyScale)     r.biggest = snapshot;
   // Running death-cause histogram (deceased array is capped, so we tally here).
   sim.deathCauses[reason] = (sim.deathCauses[reason] || 0) + 1;
+  // Attribute the death to the active event if its cause matches, for the event's
+  // TRUE toll on the chart (e.g. "the drought of year 12 cost 8 cats").
+  if (sim._eventEntry) {
+    const ev = sim._eventEntry.event;
+    if ((ev === 'harshWinter' && reason === 'harsh winter') ||
+        (ev === 'predator' && reason === 'predator') ||
+        (ev === 'drought' && (reason === 'drought' || reason === 'starvation')) ||
+        (ev === 'epidemic' && (reason === 'plague' || reason === 'illness'))) {
+      sim._eventEntry.toll++;
+    }
+  }
   // Running lifespan tally (age at death, in sim-weeks) for the bench.
   sim.lifespanSum = (sim.lifespanSum || 0) + cat.age;
   sim.lifespanCount = (sim.lifespanCount || 0) + 1;
