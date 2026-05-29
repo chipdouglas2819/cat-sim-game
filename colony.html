@@ -2132,6 +2132,17 @@ function endSimulation() {
     geneDrift.push({ label, start: (start*100).toFixed(0), end: (end*100).toFixed(0), delta, dir, arrow });
   }
 
+  // Environmental history — how many weeks of each event the colony weathered.
+  // Shown next to the drift as honest context (not an n=1 causal claim): lean
+  // events tend to favor small/efficient cats, abundance the opposite.
+  const envEventLabels = { harshWinter: 'Harsh winters', predator: 'Predator pressure', drought: 'Droughts', epidemic: 'Epidemics', plentiful: 'Times of plenty' };
+  const envHistoryRows = [];
+  for (const [k, label] of Object.entries(envEventLabels)) {
+    const wk = Math.round(state.eventExposure?.[k] || 0);
+    if (wk >= 4) envHistoryRows.push({ label, weeks: wk });
+  }
+  envHistoryRows.sort((a, b) => b.weeks - a.weeks);
+
   // First appearances
   const firstsRows = [];
   const f = state.firsts;
@@ -2191,6 +2202,19 @@ function endSimulation() {
           </div>
         `).join('')}
       </div>
+    ` : ''}
+
+    ${envHistoryRows.length ? `
+      <div class="section-title" style="margin-top:18px;">What the colony weathered</div>
+      <div class="notable-list">
+        ${envHistoryRows.map(e => `
+          <div class="notable">
+            <div><div class="who">${e.label}</div></div>
+            <div class="what">${e.weeks} weeks</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="chart-hint" style="margin-top:6px;">Lean spells (drought, harsh winter) favor smaller, lighter-eating cats; abundance grows bigger, bolder ones. Compare with the drift above.</div>
     ` : ''}
 
     ${notables.length ? `
@@ -2530,6 +2554,8 @@ function restart() {
   state.geneHistory = { boldness:[], sociability:[], playfulness:[], aggression:[], energy:[], appetite:[], bodyScale:[] };
   state.deceased = [];
   state.deathCauses = {};
+  state.eventExposure = {};
+  state.lifespanSum = 0; state.lifespanCount = 0;
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
   state.founders = [];
   parentsById.clear();
@@ -2702,6 +2728,8 @@ function beginSim() {
   state.climate = makeStartingWeather();
   state.deceased = [];
   state.deathCauses = {};
+  state.eventExposure = {};
+  state.lifespanSum = 0; state.lifespanCount = 0;
   state.records = { oldest: null, mostProlific: null, mostFights: null, mostInbred: null, biggest: null };
   // Carrying capacity → colonies stabilize around ~100 cats (soft cap). Drift
   // stays visible at this size via the founder-relative trait tint (the whole
