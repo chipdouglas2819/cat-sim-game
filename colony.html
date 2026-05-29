@@ -1442,38 +1442,25 @@ function drawCoat(ctx, cat, s, fluff, pregBelly=1) {
   // LOD: skip detailed pattern overlays when there are many cats (cheap rendering pass)
   const simplifyPatterns = state.cats.length > 400;
 
-  // Longhair fluff — a SOFT fur halo that fades at the edges, plus a few gentle
-  // tufts, so it reads as fur instead of a hard bold ring. Drawn FIRST (behind
-  // the body). Radial gradient: solid-ish near the body → transparent at the tips.
+  // Longhair fluff — a soft fur halo that fades at the edges (no tufts), a small
+  // amount larger than the body so it reads as fluff, not a bold ring. Drawn
+  // FIRST (behind the body). Radial gradient: coat color near the body → fully
+  // transparent at the tips.
   if (ph.longHair) {
     ctx.save();
-    const fr = bodyW * 1.32;   // halo reach along the long axis
-    // transparent version of the coat color — only the #rrggbb form supports the
-    // +'00' alpha suffix; fall back to a transparent rgba if it's not a 6-hex.
+    const fr = bodyW * 1.18;   // modest halo reach (was 1.32 + extra tufts)
+    // transparent version of the coat color — only #rrggbb supports the +'00'
+    // alpha suffix; fall back if it's not a 6-hex.
     const furHex = (/^#[0-9a-fA-F]{6}$/.test(ph.baseHex)) ? ph.baseHex : '#999999';
-    const grad = ctx.createRadialGradient(0, 0, bodyH * 0.7, 0, 0, fr);
+    const grad = ctx.createRadialGradient(0, 0, bodyH * 0.85, 0, 0, fr);
     grad.addColorStop(0, furHex);
-    grad.addColorStop(0.55, furHex);
-    grad.addColorStop(1, furHex + '00');   // fade to transparent (8-digit hex)
+    grad.addColorStop(0.6, furHex);
+    grad.addColorStop(1, furHex + '00');   // fade to transparent
     ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.6;
-    // Slightly irregular halo (a touch taller than wide, like a ruff)
+    ctx.globalAlpha = 0.5;
     ctx.beginPath();
-    ctx.ellipse(0, 0, fr, bodyH * 1.42, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, fr, bodyH * 1.22, 0, 0, Math.PI * 2);
     ctx.fill();
-    // A few soft tufts around the rim for texture (deterministic per cat)
-    const seed = cat.id * 2654435761;
-    const rr = (n) => { const v = Math.sin(seed + n * 78.233) * 43758.5453; return v - Math.floor(v); };
-    const tufts = state.cats.length > 400 ? 0 : 6;
-    for (let i = 0; i < tufts; i++) {
-      const ang = (i / tufts) * Math.PI * 2 + rr(i) * 0.5;
-      const tx = Math.cos(ang) * bodyW * 1.05;
-      const ty = Math.sin(ang) * bodyH * 1.1;
-      ctx.globalAlpha = 0.35;
-      ctx.beginPath();
-      ctx.ellipse(tx, ty, bodyW * 0.22, bodyH * 0.26, ang, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.globalAlpha = 1;
     ctx.restore();
   }
@@ -2783,7 +2770,43 @@ const APPEARANCE_TRAITS = [
   { label: 'Point', options: ['No','Colorpoint'],
     set: (g, i) => { g.C = i===0?['C','C']:['cs','cs']; },
     get: (g) => (g.C && g.C.every(a=>a==='cs'))?1:0 },
+  // Eyes: "Auto" clears the override (genetic default); the rest set genes.eyeOverride
+  // which deriveEyeColor respects. Hexes match the palette deriveEyeColor uses.
+  { label: 'Eyes', options: ['Auto','Gold','Copper','Green','Amber','Hazel','Blue'],
+    hexes: [null,'#e8d24a','#7a4a1e','#5fa45a','#d39b2c','#9fae5a','#bcdcee'],
+    set: (g, i) => { if (i===0) delete g.eyeOverride; else g.eyeOverride = APPEARANCE_TRAITS.find(t=>t.label==='Eyes').hexes[i]; },
+    get: (g) => { if (!g.eyeOverride) return 0; const hx=APPEARANCE_TRAITS.find(t=>t.label==='Eyes').hexes; const idx=hx.indexOf(g.eyeOverride); return idx>0?idx:0; } },
 ];
+
+// Redraw just the founder preview cat (no full card rebuild) and refresh its tags
+// + appearance labels in place — so cycling ‹ › is smooth and doesn't collapse
+// the open expander. Some traits interact (e.g. Colorpoint forces blue eyes), so
+// every appearance label is re-synced from the current genes.
+function refreshStarterVisual(key, cat) {
+  const ph = calculatePhenotype(cat.genes, cat.sex);
+  const canvasEl = document.querySelector(`canvas[data-preview="${key}"]`);
+  if (canvasEl) {
+    const ctx = canvasEl.getContext('2d');
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    const fake = { ...cat, phenotype: ph, age: 60, stage: 'adult', state: 'wander', bornFlash: 0, id: key === 'A' ? 1 : 2 };
+    drawCat(ctx, fake, canvasEl.width / 2, canvasEl.height / 2 + 10, 2.2, 0);
+  }
+  const tagWrap = document.querySelector(`[data-tags="${key}"]`);
+  if (tagWrap) {
+    tagWrap.innerHTML = '';
+    for (const t of genesToTags(cat.genes, cat.sex, ph)) {
+      const span = document.createElement('span'); span.className = 'tag'; span.textContent = t; tagWrap.appendChild(span);
+    }
+  }
+  // re-sync every appearance label (traits can interact)
+  const wrap = document.querySelector(`[data-appearance="${key}"]`);
+  if (wrap) {
+    wrap.querySelectorAll('[data-appearance-trait]').forEach(row => {
+      const tr = APPEARANCE_TRAITS.find(t => t.label === row.dataset.appearanceTrait);
+      if (tr) row.querySelector('.val').textContent = tr.options[tr.get(cat.genes, cat.sex, ph)];
+    });
+  }
+}
 
 function buildAppearancePicker(key, cat) {
   const wrap = document.querySelector(`[data-appearance="${key}"]`);
@@ -2791,18 +2814,20 @@ function buildAppearancePicker(key, cat) {
   wrap.innerHTML = '';
   for (const tr of APPEARANCE_TRAITS) {
     const ph = calculatePhenotype(cat.genes, cat.sex);
-    let idx = tr.get(cat.genes, cat.sex, ph);
+    const idx0 = tr.get(cat.genes, cat.sex, ph);
     const row = document.createElement('div');
     row.className = 'slider-row';
+    row.dataset.appearanceTrait = tr.label;
     const lbl = document.createElement('div');
     lbl.className = 'slider-label';
     const cycle = (dir) => {
-      idx = (idx + dir + tr.options.length) % tr.options.length;
-      tr.set(cat.genes, idx, cat.sex);
-      lbl.querySelector('.val').textContent = tr.options[idx];
-      refreshCard(key);   // full redraw — re-reads everything, keeps tags/preview in sync
+      const ph2 = calculatePhenotype(cat.genes, cat.sex);
+      const cur = tr.get(cat.genes, cat.sex, ph2);
+      const next = (cur + dir + tr.options.length) % tr.options.length;
+      tr.set(cat.genes, next, cat.sex);
+      refreshStarterVisual(key, cat);   // in-place — no card rebuild
     };
-    lbl.innerHTML = `<span>${tr.label}</span><span class="val">${tr.options[idx]}</span>`;
+    lbl.innerHTML = `<span>${tr.label}</span><span class="val">${tr.options[idx0]}</span>`;
     const btns = document.createElement('div');
     btns.className = 'appearance-btns';
     const prev = document.createElement('button'); prev.className='btn-pill tiny'; prev.textContent='‹';

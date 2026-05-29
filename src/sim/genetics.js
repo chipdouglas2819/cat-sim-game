@@ -86,6 +86,9 @@ export function inheritGenes(mom, dad, kittenSex) {
 // DETERMINISTIC: keyed off a stable per-cat value (no rand()), so the setup-screen
 // preview and the in-sim render produce the EXACT same eye color for a given cat.
 export function deriveEyeColor(genes, ph) {
+  // Player-chosen override from the appearance picker takes precedence (still
+  // deterministic — it's stored on the gene set, so picker and sim agree).
+  if (genes.eyeOverride) return genes.eyeOverride;
   // Colorpoint cats always have blue eyes
   if (ph.pointed) return '#9ccbe0';
   // Stable hash from fixed gene values → 0..1 (same cat always lands the same)
