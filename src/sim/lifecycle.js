@@ -142,13 +142,15 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
       ph.baseColor = 'melanistic';
       ph.baseHex = '#16161c';
       ph.pattern = 'solid';
+      ph.whitePattern = 'solid'; ph.whiteAmount = 0;    // solid coat — no white spotting overlay
       ph.melanistic = true;
     } else if (rand() < 0.004 * recBoost) {             // albino — white coat, pink-red eyes
       rareTraits.push('albino');
       ph.baseColor = 'albino';
       ph.baseHex = '#f7f1ea';
       ph.pattern = 'solid';
-      ph.whiteAmount = 1;
+      ph.whitePattern = 'solid';    // pin solid so drawCoat can't invent a spotting overlay
+      ph.whiteAmount = 1;           // keep 1 for the blue-eye gate
       ph.albino = true;
       // True albinos have pink-red eyes (both) — not heterochromia. Override both.
       ph.eyeHex = '#d98a96';

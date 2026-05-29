@@ -46,6 +46,12 @@ export function inheritGenes(mom, dad, kittenSex) {
     W: [maybeMutate(pickAllele(mg.W), ALLELE_POOLS.W), maybeMutate(pickAllele(dg.W), ALLELE_POOLS.W)],
     C: [maybeMutate(pickAllele(mg.C || ['C','C']), ALLELE_POOLS.C), maybeMutate(pickAllele(dg.C || ['C','C']), ALLELE_POOLS.C)],
   };
+  // whitePattern is a phenotype-level override (set by the picker). Inherit it so a
+  // designed founder (e.g. a tuxedo) throws tuxedo-ish offspring; falls back to the
+  // S-count derivation in calculatePhenotype when neither parent carries one.
+  const wpInherit = (mg.whitePattern && dg.whitePattern) ? pick([mg.whitePattern, dg.whitePattern])
+                  : (mg.whitePattern || dg.whitePattern);
+  if (wpInherit) g.whitePattern = wpInherit;
   // O is X-linked. Mom contributes one of her two Os; dad's contribution depends on kitten sex.
   // Female kitten gets X from mom + X from dad → 2 alleles.
   // Male kitten gets X from mom + Y from dad → 1 allele.
@@ -120,6 +126,8 @@ export function calculatePhenotype(genes, sex) {
     const wph = {
       baseColor: 'white', baseHex: '#f0e9d2',
       pattern: 'solid', whiteAmount: 1, whitePattern: 'solid', longHair: genes.L.every(a => a === 'l'),
+      orangeMode: 'none', orangeHex: null, nonOrangeHex: null,
+      pointed: false, pointHex: null,
       description: 'all white'
     };
     wph.eyeHex = deriveEyeColor(genes, wph);
@@ -163,7 +171,7 @@ export function calculatePhenotype(genes, sex) {
   if (genes.whitePattern) {
     whitePattern = genes.whitePattern;
   } else if (sCount === 0) {
-    whitePattern = jit < 0.18 ? 'locket' : 'solid';                 // none, or a tiny chest locket
+    whitePattern = 'solid';                                          // s/s = truly solid (no stray locket)
   } else if (sCount === 1) {
     whitePattern = jit < 0.4 ? 'mitted' : (jit < 0.8 ? 'tuxedo' : 'bicolor');
   } else {
@@ -171,7 +179,7 @@ export function calculatePhenotype(genes, sex) {
   }
   // Derived coverage 0..1 for the blue-eye gate + any amount-based logic.
   const WHITE_AMOUNT = { solid: 0, locket: 0.06, mitted: 0.2, tuxedo: 0.34, bicolor: 0.55, van: 0.82 };
-  const whiteAmount = WHITE_AMOUNT[whitePattern] ?? 0;
+  let whiteAmount = WHITE_AMOUNT[whitePattern] ?? 0;
 
   // Determine display name + hex
   let baseColor, baseHex, description;
@@ -179,7 +187,9 @@ export function calculatePhenotype(genes, sex) {
     baseColor = orangeName;
     baseHex = orangeHex;
   } else if (orangeMode === 'tortie') {
-    baseColor = whiteAmount > 0.1 ? 'calico' : 'tortie';
+    // calico = tortie + substantial white (patchy bicolor/van); keyed off pattern
+    // so it's robust to amount retuning. A mitted/tuxedo tortie stays 'tortie'.
+    baseColor = (whitePattern === 'bicolor' || whitePattern === 'van') ? 'calico' : 'tortie';
     baseHex = nonOrangeHex; // primary
   } else {
     baseColor = nonOrangeName;
@@ -208,6 +218,10 @@ export function calculatePhenotype(genes, sex) {
     baseHex = '#efe7da';
     baseColor = 'colorpoint';
     pattern = 'solid';
+    // colorpoint has no white spotting — clear it so drawCoat doesn't paint white
+    // over the pale body and the head blaze doesn't erase the muzzle mask.
+    whitePattern = 'solid';
+    whiteAmount = 0;
   }
 
   // Build a draft phenotype, then derive deterministic eye color from it so the

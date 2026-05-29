@@ -226,6 +226,9 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   font-weight: 600;
 }
 .eye-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); display: inline-block; }
+.look-row.masked { opacity: 0.4; }
+.look-row.masked .look-label { font-style: italic; }
+.look-pill:disabled { pointer-events: none; }
 /* ── Cat presets ── */
 .preset-list { margin: 4px 0 8px; display: flex; flex-direction: column; gap: 5px; }
 .preset-empty { font-size: 12px; color: var(--ink-faint); font-style: italic; padding: 2px 0; }
@@ -1379,12 +1382,22 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
     ctx.restore();
   }
 
-  // head white blaze if white spotting
-  if (ph.whiteAmount > 0.2) {
-    ctx.fillStyle = '#f3ecd5';
-    ctx.beginPath();
-    ctx.ellipse(headR*0.4, 0, headR*0.55, headR*0.35, 0, 0, Math.PI*2);
-    ctx.fill();
+  // head white marking — driven by the white PATTERN (not a bare amount). A
+  // vertical blaze down the face for tuxedo/bicolor/mitted; van gets a mostly
+  // white face (ears stay colored). Colorpoint cats keep their muzzle mask.
+  if (!ph.pointed) {
+    const hwp = ph.whitePattern || 'solid';
+    if (hwp === 'van' || ph.whiteAmount >= 0.8) {
+      ctx.fillStyle = '#f3ecd5';
+      ctx.beginPath();
+      ctx.ellipse(headR*0.35, 0, headR*0.8, headR*0.78, 0, 0, Math.PI*2);
+      ctx.fill();
+    } else if (hwp === 'tuxedo' || hwp === 'bicolor' || hwp === 'mitted') {
+      ctx.fillStyle = '#f3ecd5';
+      ctx.beginPath();
+      ctx.ellipse(headR*0.5, 0, headR*0.30, headR*0.6, 0, 0, Math.PI*2);   // vertical face blaze
+      ctx.fill();
+    }
   }
 
   // eyes — the original cute round eye, now COLORED by iris, with a vertical
@@ -1606,35 +1619,46 @@ function drawCoat(ctx, cat, s, fluff, pregBelly=1) {
     ctx.restore();
   }
 
-  // White spotting — NAMED patterns. The body's local frame: +x is the front
-  // (toward the head/nose), -x is the rear/tail; +y/-y are the two flanks. Paws
-  // are drawn near the front-and-rear lower edges.
-  const wp = ph.whitePattern || (ph.whiteAmount > 0.4 ? 'bicolor' : ph.whiteAmount > 0 ? 'tuxedo' : 'solid');
+  // White spotting — NAMED patterns, authored for the TOP-DOWN view. Local frame:
+  // +x = FRONT (head/nose), -x = REAR (tail); ±y = the two flanks. From above you
+  // see the BACK, so each pattern is distinguished by HOW MUCH of the back — and
+  // which END — stays colored. Color = the unpainted body ellipse; white = ink.
+  const wp = ph.whitePattern || 'solid';
   if (wp !== 'solid') {
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI*2);
     ctx.clip();
-    ctx.fillStyle = '#f3ecd5';
-    const chest = () => { ctx.beginPath(); ctx.ellipse(bodyW*0.55, 0, bodyW*0.26, bodyH*0.42, 0, 0, Math.PI*2); ctx.fill(); };
-    const paws = () => { // four white paw-tips near the lower body edges
-      for (const px of [bodyW*0.6, -bodyW*0.55]) for (const py of [bodyH*0.72, -bodyH*0.72]) {
-        ctx.beginPath(); ctx.ellipse(px, py, bodyW*0.16, bodyH*0.24, 0, 0, Math.PI*2); ctx.fill();
+    const WHITE = '#f3ecd5';
+    ctx.fillStyle = WHITE;
+    // small white throat dot at the front midline
+    const throat = () => { ctx.beginPath(); ctx.ellipse(bodyW*0.55, 0, bodyW*0.20, bodyH*0.30, 0, 0, Math.PI*2); ctx.fill(); };
+    // four white paw caps at the leg corners — visible on the flank silhouette
+    const toes = () => {
+      for (const px of [bodyW*0.62, -bodyW*0.62]) for (const py of [bodyH*0.66, -bodyH*0.66]) {
+        ctx.beginPath(); ctx.ellipse(px, py, bodyW*0.18, bodyH*0.28, 0, 0, Math.PI*2); ctx.fill();
       }
     };
-    const belly = () => { ctx.beginPath(); ctx.ellipse(bodyW*0.1, bodyH*0.45, bodyW*0.85, bodyH*0.6, 0, 0, Math.PI*2); ctx.fill(); };
+    // white bib up the front-center, never crossing onto the rear/dorsal back
+    const bib = () => {
+      ctx.beginPath(); ctx.ellipse(bodyW*0.5, 0, bodyW*0.30, bodyH*0.55, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(bodyW*0.15, 0, bodyW*0.34, bodyH*0.18, 0, 0, Math.PI*2); ctx.fill();
+    };
     if (wp === 'locket') {
-      chest();
+      throat();                                  // ~6%: one small chest dot
     } else if (wp === 'mitted') {
-      paws(); chest();
+      throat(); toes();                          // ~21%: throat + four feet
     } else if (wp === 'tuxedo') {
-      belly(); chest(); paws();   // classic tuxedo: white chest/belly/paws, colored "jacket"
+      bib(); toes();                             // ~32%: white front bib + feet, colored back "jacket"
     } else if (wp === 'bicolor') {
-      // ~half white: front + underside white, colored cap over the back/rear
-      ctx.fillRect(-bodyW*1.2, -bodyH*1.2, bodyW*2.0, bodyH*2.4);
+      // ~61% white: whiten front+flanks, leave a COLORED saddle over the rear/back
+      ctx.beginPath(); ctx.ellipse(bodyW*0.7, 0, bodyW*1.0, bodyH*1.2, 0, 0, Math.PI*2); ctx.fill();
     } else if (wp === 'van') {
-      // mostly white — only the rear keeps color (head/tail color drawn elsewhere)
-      ctx.fillRect(-bodyW*1.2, -bodyH*1.2, bodyW*2.3, bodyH*2.4);
+      // ~84% white: nearly all white, just a small COLORED spot at the rump (tail base)
+      ctx.beginPath(); ctx.ellipse(0, 0, bodyW*1.3, bodyH*1.3, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = ph.baseHex;
+      ctx.beginPath(); ctx.ellipse(-bodyW*0.72, 0, bodyW*0.30, bodyH*0.55, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = WHITE;
     }
     ctx.restore();
   }
@@ -2893,7 +2917,7 @@ function applyLookToGenes(look, genes, sex) {
   // S-count derivation in calculatePhenotype) and set S to a matching amount so
   // any S-based logic stays sane.
   const wpLower = (look.white || 'Solid').toLowerCase();
-  if (wpLower === 'solid') { delete genes.whitePattern; genes.S = ['s','s']; }
+  if (wpLower === 'solid') { genes.whitePattern = 'solid'; genes.S = ['s','s']; }  // pin Solid (authoritative)
   else {
     genes.whitePattern = wpLower;
     genes.S = (wpLower === 'bicolor' || wpLower === 'van') ? ['S','S']
@@ -2934,20 +2958,31 @@ function buildAppearancePicker(key, cat) {
   if (!wrap) return;
   if (!cat.look) cat.look = genesToLook(cat.genes, cat.sex);
   wrap.innerHTML = '';
+  // Cross-trait masking: dominant White masks pattern/white/point; Colorpoint
+  // forces solid + no white. Greyed rows show WHY rather than lying with a lit pill.
+  const isWhite = cat.look.color === 'White';
+  const isPoint = cat.look.point === 'Colorpoint';
+  const maskedRows = {
+    pattern: isWhite ? 'white coat hides pattern' : isPoint ? 'colorpoint is solid' : null,
+    white:   isWhite ? 'already all white' : isPoint ? 'colorpoint has no white' : null,
+    point:   isWhite ? 'white coat hides points' : null,
+  };
   for (const tr of LOOK_TRAITS) {
     // Tortie is female-only — hide it for males so every shown option is valid.
     const opts = tr.options.filter(o => !(o === 'Tortie' && cat.sex === 'M'));
+    const masked = maskedRows[tr.key];
     const row = document.createElement('div');
-    row.className = 'look-row';
+    row.className = 'look-row' + (masked ? ' masked' : '');
     const lbl = document.createElement('div');
     lbl.className = 'look-label';
-    lbl.textContent = tr.label;
+    lbl.textContent = masked ? `${tr.label} — ${masked}` : tr.label;
     const seg = document.createElement('div');
     seg.className = 'look-seg';
     for (const opt of opts) {
       const pill = document.createElement('button');
       pill.className = 'look-pill' + (cat.look[tr.key] === opt ? ' active' : '');
       pill.textContent = opt;
+      if (masked) pill.disabled = true;
       // Eye pills get a color dot
       if (tr.key === 'eyes' && EYE_HEX[opt]) {
         const dot = document.createElement('span'); dot.className = 'eye-dot'; dot.style.background = EYE_HEX[opt];
@@ -2956,9 +2991,10 @@ function buildAppearancePicker(key, cat) {
       pill.addEventListener('click', () => {
         cat.look[tr.key] = opt;
         applyLookToGenes(cat.look, cat.genes, cat.sex);
-        // update active state on this row's pills
-        seg.querySelectorAll('.look-pill').forEach(p => p.classList.toggle('active', p === pill));
         refreshStarterVisual(key, cat);
+        // Color/Point toggle which rows are masked → rebuild so greying updates.
+        if (tr.key === 'color' || tr.key === 'point') buildAppearancePicker(key, cat);
+        else seg.querySelectorAll('.look-pill').forEach(p => p.classList.toggle('active', p === pill));
       });
       seg.appendChild(pill);
     }
@@ -3032,7 +3068,8 @@ document.addEventListener('click', (e) => {
       const slotSex = state.starter[k].sex;   // keep the slot's sex (A=male, B=female)
       const genes = { ...p.genes };
       // Fix X-linked O allele count if the preset's sex differs from the slot.
-      if (slotSex === 'M' && genes.O && genes.O.length === 2) genes.O = [genes.O[0]];
+      // males can't be tortie → show the red side deterministically (not a coin-flip)
+      if (slotSex === 'M' && genes.O && genes.O.length === 2) genes.O = [genes.O.includes('O') ? 'O' : 'o'];
       else if (slotSex === 'F' && genes.O && genes.O.length === 1) genes.O = [genes.O[0], genes.O[0]];
       state.starter[k] = { sex: slotSex, genes, name: p.name, look: null };
       refreshCard(k);
