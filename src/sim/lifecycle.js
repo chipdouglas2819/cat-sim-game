@@ -206,9 +206,9 @@ export function giveBirth(sim, mom, sinks) {
 
   // High boldness: better foraging in lean times, but extra predator risk loss
   if (sim.activeEvent === 'plentiful' || sim.activeEvent === 'drought') {
-    traitBonus += (mom.genes.boldness - 0.5) * 0.4;
+    traitBonus += (mom.genes.boldness - 0.5) * 0.6;
   } else if (sim.activeEvent === 'predator') {
-    traitBonus -= (mom.genes.boldness - 0.5) * 0.3;   // bold moms get caught
+    traitBonus -= (mom.genes.boldness - 0.5) * 0.6;   // bold moms get caught
   }
   // High energy: critical in winter, costs in drought (high metabolism)
   if (sim.season === 'winter' || sim.activeEvent === 'harshWinter') {
@@ -218,9 +218,9 @@ export function giveBirth(sim, mom, sinks) {
   }
   // High aggression: defends kittens from predators, but costs in peaceful times
   if (sim.activeEvent === 'predator') {
-    traitBonus += (mom.genes.aggression - 0.5) * 0.5;
+    traitBonus += (mom.genes.aggression - 0.5) * 0.9;   // strong defender reward
   } else if (sim.activeEvent === 'plentiful' || (!sim.activeEvent && sim.season !== 'winter')) {
-    traitBonus -= (mom.genes.aggression - 0.5) * 0.15;
+    traitBonus -= (mom.genes.aggression - 0.5) * 0.25;
   }
   // High appetite: only beneficial when food is plentiful
   if (sim.activeEvent === 'plentiful') {
