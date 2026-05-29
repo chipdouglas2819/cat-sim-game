@@ -2108,10 +2108,12 @@ function endSimulation() {
   if (mostInbred && mostInbred.inbreedF > 0.05) notables.push({ label: 'Most inbred', name: mostInbred.name, detail: `F = ${mostInbred.inbreedF.toFixed(3)}` });
   if (biggest) notables.push({ label: 'Largest', name: biggest.name, detail: `${(biggest.bodyScale*100).toFixed(0)}% scale` });
 
-  // Gene drift summary — compare first sample to last
+  // Gene drift summary — compare first sample to last. Includes Size (bodyScale)
+  // so the end-screen drift list reflects ALL evolving traits, not just the 6
+  // behavioral genes (user: "doesn't reflect size").
   const traitLabels = {
     boldness:'Boldness', sociability:'Sociability', playfulness:'Playfulness',
-    aggression:'Aggression', energy:'Energy', appetite:'Appetite'
+    aggression:'Aggression', energy:'Energy', appetite:'Appetite', bodyScale:'Size'
   };
   const geneDrift = [];
   for (const [key, label] of Object.entries(traitLabels)) {
