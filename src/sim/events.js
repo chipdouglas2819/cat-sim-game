@@ -125,14 +125,23 @@ export function rollSeasonalEvent(sim, season, { logEvent }) {
       logEvent(sim.activeEventMessage, 'death');
     }
   }
-  // Record event start in the timeline for chart markers
+  // Record event start in the timeline for chart markers. `toll` is the actual
+  // number of deaths this event causes (incremented in triggerDeath via
+  // sim._eventEntry), so markers can report a true impact instead of a
+  // misleading population-window delta.
   if (sim.activeEvent) {
-    sim.eventTimeline.push({
+    const entry = {
       simTime: sim.simTime,
       event: sim.activeEvent,
       season: season,
       message: sim.activeEventMessage,
-    });
+      toll: 0,
+      popStart: sim.cats.filter(c => !c.dying).length,
+    };
+    sim.eventTimeline.push(entry);
+    sim._eventEntry = entry;
+  } else {
+    sim._eventEntry = null;
   }
 }
 

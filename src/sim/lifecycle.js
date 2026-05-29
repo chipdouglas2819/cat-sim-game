@@ -7,6 +7,11 @@ import { rand, pick, gauss, clamp, lightenHex } from './util.js';
 import { calculatePhenotype, inheritGenes } from './genetics.js';
 
 // The per-cat floating pop-up comment system was removed (laggy, low value —
+// meaningful events go to the top-of-screen log). cat.floatTexts is a shared
+// no-op sink so the scattered .push() calls cost nothing and nothing renders.
+const FLOAT_SINK = { push() {} };
+
+// The per-cat floating pop-up comment system was removed (laggy, low value —
 // meaningful events go to the top-of-screen log instead). cat.floatTexts is a
 // shared no-op sink so the scattered .push() calls cost nothing and nothing
 // renders. Render + decay loops were deleted.
