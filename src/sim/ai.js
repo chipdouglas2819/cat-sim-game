@@ -178,6 +178,9 @@ export function updateCat(sim, cat, dt, sinks) {
   cat.bornFlash = Math.max(0, cat.bornFlash - dt * 0.5);
   cat.fightGlow = Math.max(0, cat.fightGlow - dt * 0.6);
   cat.postureCooldown = Math.max(0, (cat.postureCooldown || 0) - dt);
+  // Lightweight personality cue: a single transient icon (replaces the removed
+  // laggy floatTexts array). One field, decays each tick, rendered in drawCat.
+  if (cat.cueT > 0) cat.cueT = Math.max(0, cat.cueT - dt);
   const prevStage = cat.stage;
   cat.stage = ageStage(cat.age);
   if (cat.stage !== prevStage && prevStage) {
@@ -200,7 +203,7 @@ export function updateCat(sim, cat, dt, sinks) {
       return false;
     });
     if (nearbyAdult) {
-      cat.floatTexts.push({ text: '〰', t: 0, life: 1.4 });
+      cat.cue = '〰'; cat.cueT = 1.4;
       cat.postureCooldown = 5 + rand() * 4;
       if (cat.genes.aggression > 0.7) {
         const dx = nearbyAdult.x - cat.x, dy = nearbyAdult.y - cat.y;
@@ -220,7 +223,7 @@ export function updateCat(sim, cat, dt, sinks) {
       return false;
     });
     if (crowded >= 2) {
-      cat.floatTexts.push({ text: '·', t: 0, life: 1.2 });
+      cat.cue = '·'; cat.cueT = 1.2;
       cat.postureCooldown = 7 + rand() * 5;
     }
   }
@@ -258,7 +261,7 @@ export function updateCat(sim, cat, dt, sinks) {
     cat.estrusPhase = (cat.estrusPhase + dt) % ESTRUS_CYCLE_WEEKS;
     cat.inEstrus = isBreedingSeason(sim) && cat.estrusPhase < ESTRUS_DURATION;
     if (cat.inEstrus && !prevEstrus && cat.condition > 0.55) {
-      cat.floatTexts.push({ text: '♥', t: 0, life: 1.6 });
+      cat.cue = '♥'; cat.cueT = 1.6;
     }
   } else {
     cat.inEstrus = false;
@@ -342,7 +345,7 @@ export function updateCat(sim, cat, dt, sinks) {
           // (was a real-ms setTimeout — speed-scaled sim made it inconsistent;
           // audit N2).
           if (!cat._cryUntil || sim.simTime > cat._cryUntil) {
-            cat.floatTexts.push({ text: '!', t: 0, life: 1.5 });
+            cat.cue = '!'; cat.cueT = 1.5;
             cat._cryUntil = sim.simTime + 0.4;   // ~1.5 real-seconds at 1× speed
           }
         } else {
@@ -497,7 +500,7 @@ export function executeState(sim, cat, dt, sinks) {
       if (!cat.sick && cat.genes.energy > 0.65 && cat.energy > 0.7 && cat.stage !== 'senior') {
         if ((cat._zoomTimer || 0) <= 0 && rand() < 0.004) {
           cat._zoomTimer = 1.2 + rand() * 1.5;
-          cat.floatTexts.push({ text: '⚡', t: 0, life: 0.8 });
+          cat.cue = '⚡'; cat.cueT = 0.8;
         }
         if ((cat._zoomTimer || 0) > 0) {
           cat._zoomTimer -= dt;
@@ -512,7 +515,7 @@ export function executeState(sim, cat, dt, sinks) {
         const pounceAng = cat.dir + (rand() - 0.5) * Math.PI;
         cat.vx += Math.cos(pounceAng) * 2.5;
         cat.vy += Math.sin(pounceAng) * 2.5;
-        cat.floatTexts.push({ text: '♪', t: 0, life: 1 });
+        cat.cue = '♪'; cat.cueT = 1;
       }
       break;
     }
@@ -583,7 +586,7 @@ export function executeState(sim, cat, dt, sinks) {
         cat.vy += (rand() - 0.5) * 5;
         cat.social = clamp(cat.social + 0.03 * dt, 0, 1);
         if (rand() < 0.03) {
-          cat.floatTexts.push({ text: '♪', t: 0, life: 1.2 });
+          cat.cue = '♪'; cat.cueT = 1.2;
         }
       }
       break;
@@ -610,7 +613,7 @@ export function executeState(sim, cat, dt, sinks) {
         const aff = cat.affinity.get(cat.targetCat.id) || 0;
         cat.affinity.set(cat.targetCat.id, clamp(aff + 0.05 * dt, -1, 1));
         if (cat.state === 'groom' && rand() < 0.02) {
-          cat.floatTexts.push({ text: '✿', t: 0, life: 1.2 });
+          cat.cue = '✿'; cat.cueT = 1.2;
         }
       }
       if (cat.stateTimer < -3) cat.state = 'wander';
@@ -646,7 +649,7 @@ export function executeState(sim, cat, dt, sinks) {
         cat.targetCat.targetCat = cat;
         cat.targetCat.stateTimer = 2;
         if (rand() < 0.05) {
-          cat.floatTexts.push({ text: '⚡', t: 0, life: 1 });
+          cat.cue = '⚡'; cat.cueT = 1;
           logEvent(`${cat.name} scrapped with ${cat.targetCat.name}`, 'event');
         }
         cat.state = 'wander';

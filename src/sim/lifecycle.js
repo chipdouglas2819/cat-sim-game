@@ -6,14 +6,9 @@ import {
 import { rand, pick, gauss, clamp, lightenHex } from './util.js';
 import { calculatePhenotype, inheritGenes, deriveEyeColor } from './genetics.js';
 
-// The per-cat floating pop-up comment system was removed (laggy, low value —
-// meaningful events go to the top-of-screen log). cat.floatTexts is a shared
-// no-op sink so the scattered .push() calls cost nothing and nothing renders.
-const FLOAT_SINK = { push() {} };
-
-// The per-cat floating pop-up comment system was removed (laggy, low value —
-// meaningful events go to the top-of-screen log instead). cat.floatTexts is a
-// shared no-op sink so the scattered .push() calls cost nothing and nothing
+// The laggy per-cat floatTexts array was replaced by a single lightweight
+// cat.cue / cat.cueT (one transient icon, decays each tick, rendered in drawCat).
+// Meaningful colony-level events still go to the top-of-screen log.
 
 // Map age (weeks) to life stage.
 export function ageStage(age) {
@@ -205,7 +200,8 @@ export function createCat(sim, { sex, genes, name, parents = null, x, y, age = 0
     dying: false,
     dyingT: 0,
     dyingReason: '',
-    floatTexts: FLOAT_SINK,      // removed pop-up system — no-op sink
+    cue: null,                   // transient personality icon (set by ai/lifecycle)
+    cueT: 0,                     // cue remaining lifetime (sim-weeks)
     bornFlash: 0.6,              // sparkle effect on birth
     fightGlow: 0,                // flares red when fighting
     fightCount: 0,               // total fights initiated/joined (for end screen)
@@ -240,8 +236,8 @@ export function mate(sim, a, b, { logEvent }) {
   male.cooldownUntil = sim.simTime + 6;
   a.state = 'wander';
   b.state = 'wander';
-  female.floatTexts.push({ text: '♥', t: 0, life: 1.5 });
-  male.floatTexts.push({ text: '♥', t: 0, life: 1.5 });
+  female.cue = '♥'; female.cueT = 1.5;
+  male.cue = '♥'; male.cueT = 1.5;
   logEvent(`${female.name} and ${male.name} paired`, 'mate');
 }
 
@@ -458,7 +454,7 @@ export function triggerDeath(sim, cat, reason, { logEvent }) {
     const mom = (() => { const _m = sim.catById.get(cat.parents[0]); return _m && !_m.dying ? _m : null; })();
     if (mom) {
       mom.social = Math.min(mom.social, 0.15);   // social drive blunted
-      if (sim.cats.length < 500) mom.floatTexts.push({ text: '…', t: 0, life: 2 });
+      if (sim.cats.length < 500) { mom.cue = '…'; mom.cueT = 2; }
     }
   }
 }

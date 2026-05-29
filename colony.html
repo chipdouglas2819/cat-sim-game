@@ -1395,7 +1395,21 @@ function drawCat(ctx, cat, x, y, scale=1, dir=0) {
     ctx.fill();
   }
 
-  // (per-cat floating pop-up text removed — the floatText system is gone)
+  // Personality cue — a single transient icon that floats up + fades, showing
+  // what the cat is feeling/doing (posture 〰, aloof ·, heart ♥, play ♪, groom ✿,
+  // zoomie ⚡, cry !, grief …). Lightweight: one field, no array (the old
+  // floatTexts array was the lag source). cueT counts down in sim-weeks.
+  if (cat.cue && cat.cueT > 0 && s > 0.55) {
+    const cueLife = 1.4;
+    const prog = 1 - cat.cueT / cueLife;        // 0 → just set, 1 → expiring
+    const a = Math.max(0, Math.min(1, cat.cueT * 1.4));
+    ctx.globalAlpha = a;
+    ctx.font = `${13*scale}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#3a3024';
+    ctx.fillText(cat.cue, x, y - 20*scale - prog*10*scale);
+    ctx.globalAlpha = 1;
+  }
   // Restore original phenotype colors that we temporarily tinted
   if (origBaseHex !== null) ph.baseHex = origBaseHex;
   if (origOrangeHex !== null) ph.orangeHex = origOrangeHex;
