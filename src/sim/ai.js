@@ -404,7 +404,7 @@ export function updateCat(sim, cat, dt, sinks) {
       const f = sim.food[i];
       if (Math.hypot(cat.x - f.x, cat.y - f.y) < 16) {
         // Bigger cats eat more per bite. Bold cats also more decisive eaters.
-        const biteCap = 0.6 + cat.bodyScale * 0.25 + cat.genes.boldness * 0.1;
+        const biteCap = 0.55 + cat.bodyScale * 0.22 + cat.genes.boldness * 0.08 + cat.genes.appetite * 0.18;
         const eaten = Math.min(f.amount, biteCap, 1 - cat.hunger);
         cat.hunger = clamp(cat.hunger + eaten, 0, 1);
         f.amount -= eaten;
@@ -433,9 +433,11 @@ export function executeState(sim, cat, dt, sinks) {
         cat.vx += Math.cos(cat.dir) * intensity;
         cat.vy += Math.sin(cat.dir) * intensity;
       }
-      // Timid cats occasionally freeze
+      // Timid cats occasionally freeze (startle/fear) — now shows a cue so the
+      // timidity reads on screen.
       if (boldness < 0.35 && rand() < 0.01) {
         cat.vx *= 0.3; cat.vy *= 0.3;
+        if (cat.cueT <= 0) { cat.cue = '!'; cat.cueT = 0.9; }
       }
       // TERRITORIAL HOME PULL — cats drift back toward their family's home range
       // when they stray too far, so matrilines cluster into family territories
@@ -522,22 +524,28 @@ export function executeState(sim, cat, dt, sinks) {
     case 'sleep': {
       if (!cat._sleepTargetSet) {
         cat._sleepTargetSet = true;
-        let buddyX = null, buddyY = null, buddyD = Infinity;
-        forCatsNear(sim, cat.x, cat.y, 140, (c) => {
-          if (c === cat || c.dying || c._remove) return false;
-          if (c.state !== 'sleep') return false;
-          const d = dist(cat, c);
-          if (d < 140 && d < buddyD) {
-            buddyD = d;
-            const ang = Math.atan2(cat.y - c.y, cat.x - c.x);
-            buddyX = c.x + Math.cos(ang) * 14;
-            buddyY = c.y + Math.sin(ang) * 14;
+        // Social cats pile up to sleep; aloof cats sleep alone (matches the trait).
+        // Below ~0.4 sociability a cat won't seek a sleep buddy at all.
+        if (cat.genes.sociability >= 0.4) {
+          let buddyX = null, buddyY = null, buddyD = Infinity;
+          forCatsNear(sim, cat.x, cat.y, 140, (c) => {
+            if (c === cat || c.dying || c._remove) return false;
+            if (c.state !== 'sleep') return false;
+            // don't pile onto an aloof sleeper
+            if (c.genes.sociability < 0.3) return false;
+            const d = dist(cat, c);
+            if (d < 140 && d < buddyD) {
+              buddyD = d;
+              const ang = Math.atan2(cat.y - c.y, cat.x - c.x);
+              buddyX = c.x + Math.cos(ang) * 14;
+              buddyY = c.y + Math.sin(ang) * 14;
+            }
+            return false;
+          });
+          if (buddyX !== null) {
+            cat._sleepTargetX = buddyX;
+            cat._sleepTargetY = buddyY;
           }
-          return false;
-        });
-        if (buddyX !== null) {
-          cat._sleepTargetX = buddyX;
-          cat._sleepTargetY = buddyY;
         }
       }
       if (cat._sleepTargetX != null) {
@@ -559,7 +567,7 @@ export function executeState(sim, cat, dt, sinks) {
       moveToward(cat, f.target.x, f.target.y, speed);
       if (Math.hypot(cat.x - f.target.x, cat.y - f.target.y) < 14) {
         // eat — bigger cats take bigger bites (consistent with opportunistic eating)
-        const biteCap = 0.6 + cat.bodyScale * 0.25 + cat.genes.boldness * 0.1;
+        const biteCap = 0.55 + cat.bodyScale * 0.22 + cat.genes.boldness * 0.08 + cat.genes.appetite * 0.18;
         const eaten = Math.min(f.target.amount, biteCap, 1 - cat.hunger);
         cat.hunger = clamp(cat.hunger + eaten, 0, 1);
         f.target.amount -= eaten;
