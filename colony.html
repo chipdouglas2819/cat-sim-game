@@ -155,8 +155,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
   position: relative;
   overflow: hidden;
 }
-.cat-preview.big { height: 170px; }
-.cat-preview canvas { display: block; max-width: 100%; }
+.cat-preview canvas { display: block; }
 
 .cat-name-row {
   display: flex; align-items: center; gap: 8px;
@@ -1050,7 +1049,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="cat-card-head">
           <div class="cat-card-title">First<span class="sex-pill male">Male</span></div>
         </div>
-        <div class="cat-preview big"><canvas data-preview="A" width="220" height="160"></canvas></div>
+        <div class="cat-preview"><canvas data-preview="A" width="180" height="120"></canvas></div>
         <div class="cat-name-row">
           <input class="cat-name-input" data-name="A" type="text" maxlength="14">
         </div>
@@ -1079,7 +1078,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: none; ba
         <div class="cat-card-head">
           <div class="cat-card-title">Second<span class="sex-pill female">Female</span></div>
         </div>
-        <div class="cat-preview big"><canvas data-preview="B" width="220" height="160"></canvas></div>
+        <div class="cat-preview"><canvas data-preview="B" width="180" height="120"></canvas></div>
         <div class="cat-name-row">
           <input class="cat-name-input" data-name="B" type="text" maxlength="14">
         </div>
@@ -1673,202 +1672,6 @@ function darken(hex, amt) {
   const b = parseInt(hex.slice(5,7),16);
   const f = 1-amt;
   return `rgb(${Math.floor(r*f)},${Math.floor(g*f)},${Math.floor(b*f)})`;
-}
-
-// ─── PREVIEW CAT (side profile) ───────────────────────────────
-// A left-facing standing cat used ONLY for the founder-setup preview, where the
-// player studies one big cat and coat patterns must READ. The tiny in-colony
-// sprite stays drawCat()/drawCoat() (top-down) — patterns are invisible at ~10px
-// there and top-down is needed for rotate-to-heading. IMPORTANT: any new
-// phenotype field consumed here must also be handled in drawCat()/drawCoat().
-// Reads ph directly (baseHex, pattern, whitePattern, pointed/pointHex, eyeHex,
-// eyeSectoral, longHair, tortie/calico orangeHex, smoke/silver).
-function drawCatProfile(ctx, ph, cx, cy, scale) {
-  const BASE = ph.baseHex;
-  const EXTREM = (ph.pointed && ph.pointHex) ? ph.pointHex : ph.baseHex;
-  const WHITE = '#f3ecd5';
-  const FAR = darken(BASE, 0.14);
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  // vertical leg capsule helper
-  const cap = (x, y0, y1, w) => {
-    ctx.moveTo(x - w, y0); ctx.lineTo(x - w, y1);
-    ctx.arc(x, y1, w, Math.PI, 0, false);
-    ctx.lineTo(x + w, y0); ctx.arc(x, y0, w, 0, Math.PI, false);
-  };
-  // body silhouette: barrel + haunch + chest + neck + head-base as one region
-  const bodyPath = () => {
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 24, 14, 0, 0, 6.2832);
-    ctx.moveTo(27, 2); ctx.ellipse(16, 2, 11, 11, 0, 0, 6.2832);   // haunch (rear)
-    ctx.moveTo(-5, 3); ctx.ellipse(-15, 3, 10, 10, 0, 0, 6.2832);  // chest (front)
-    ctx.moveTo(-20, -6); ctx.ellipse(-26, -4, 8, 9, 0, 0, 6.2832); // neck base
-  };
-  // body + four legs + paws union — the load-bearing clip for white (socks/bib/face)
-  const fullClip = () => {
-    bodyPath();
-    cap(21, 10, 30, 3.5); cap(-9, 8, 30, 3.2); cap(15, 10, 30, 3.8); cap(-14, 8, 29, 3.5);
-    for (const [px, py, rx] of [[-14, 29, 4.5], [-9, 30, 4], [18, 29, 4.5], [21, 30, 4]]) {
-      ctx.moveTo(px + rx, py); ctx.ellipse(px, py, rx, 3, 0, 0, 6.2832);
-    }
-  };
-
-  // 0 ground shadow
-  ctx.fillStyle = 'rgba(70,50,20,0.18)';
-  ctx.beginPath(); ctx.ellipse(-2, 33, 28, 4, 0, 0, 6.2832); ctx.fill();
-
-  // 1 far hind leg, 2 far front leg (darker for depth)
-  ctx.fillStyle = FAR;
-  ctx.beginPath(); cap(21, 10, 30, 3.5); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(21, 30, 4, 2.6, 0, 0, 6.2832); ctx.fill();
-  ctx.beginPath(); cap(-9, 8, 30, 3.2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(-9, 30, 4, 2.6, 0, 0, 6.2832); ctx.fill();
-
-  // 3 tail (extremity color; longhair = soft wide underlay + solid)
-  const tail = (col, lw, a) => { ctx.strokeStyle = col; ctx.globalAlpha = a; ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.moveTo(22, 2); ctx.quadraticCurveTo(38, -6, 42, -16); ctx.stroke(); ctx.globalAlpha = 1; };
-  if (ph.longHair) { tail(EXTREM, 11, 0.5); tail(EXTREM, 6, 1); } else { tail(EXTREM, 6, 1); }
-
-  // 4 body group (single silhouette fill — no welded-ball seams)
-  ctx.fillStyle = BASE; bodyPath(); ctx.fill();
-
-  // 5 near hind leg (bent hock), 6 near front leg, on top of the body
-  ctx.fillStyle = BASE;
-  ctx.beginPath(); cap(15, 8, 18, 3.8); ctx.fill();
-  ctx.beginPath(); cap(18, 18, 30, 3.8); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(18, 29, 4.5, 2.6, 0, 0, 6.2832); ctx.fill();
-  ctx.beginPath(); cap(-14, 8, 29, 3.5); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(-14, 29, 4, 2.6, 0, 0, 6.2832); ctx.fill();
-
-  // 7 head + muzzle (front-left)
-  ctx.fillStyle = BASE;
-  ctx.beginPath(); ctx.arc(-30, -6, 10, 0, 6.2832); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(-38, -2, 5, 4, 0, 0, 6.2832); ctx.fill();
-
-  // 8 ears (near solid, far darker)
-  ctx.fillStyle = BASE;
-  ctx.beginPath(); ctx.moveTo(-34, -13); ctx.lineTo(-37, -24); ctx.lineTo(-28, -16); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = darken(BASE, 0.14);
-  ctx.beginPath(); ctx.moveTo(-28, -14); ctx.lineTo(-29, -25); ctx.lineTo(-22, -16); ctx.closePath(); ctx.fill();
-
-  // 9a tortie/calico patches
-  if (ph.baseColor === 'tortie' || ph.baseColor === 'calico') {
-    ctx.save(); bodyPath(); ctx.clip(); ctx.fillStyle = ph.orangeHex;
-    const seed = 49297; const r = (n) => { const x = Math.sin(seed + n * 12.9898) * 43758.5453; return x - Math.floor(x); };
-    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse((r(i*2)-0.5)*40, (r(i*2+1)-0.5)*22, 9, 7, r(i*3)*Math.PI, 0, 6.2832); ctx.fill(); }
-    ctx.beginPath(); ctx.ellipse(-27, -9, 5, 5, 0, 0, 6.2832); ctx.fill();
-    ctx.restore();
-  }
-
-  // 9b tabby stripes
-  if (ph.pattern !== 'solid' && !ph.pointed) {
-    ctx.save(); bodyPath(); ctx.clip();
-    const d = darken(BASE, 0.4); ctx.strokeStyle = d; ctx.fillStyle = d; ctx.lineCap = 'round';
-    if (ph.pattern === 'Mc') {                 // mackerel — vertical ribs off the spine
-      ctx.lineWidth = 1.4;
-      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i*5, -13); ctx.quadraticCurveTo(i*5+1.5, 0, i*5-1, 13); ctx.stroke(); }
-    } else if (ph.pattern === 'Cs') {          // classic — flank swirl + spine bands
-      ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.ellipse(6, 0, 8, 8, 0, 0, 6.2832); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(6, 0, 4, 4, 0, 0, 6.2832); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-12, -9); ctx.lineTo(20, -9); ctx.stroke();
-    } else if (ph.pattern === 'Sp') {          // spotted — dot rows
-      const r = (n) => { const x = Math.sin(7+n*43.7)*43758.5; return x-Math.floor(x); };
-      for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.ellipse(-18+r(i)*38, -9+r(i+99)*18, 1.6, 1.6, 0, 0, 6.2832); ctx.fill(); }
-    } else {                                   // ticked — faint speckle + spine
-      ctx.globalAlpha = 0.6;
-      const r = (n) => { const x = Math.sin(13+n*91.1)*43758.5; return x-Math.floor(x); };
-      for (let i = 0; i < 16; i++) { ctx.beginPath(); ctx.ellipse(-18+r(i)*38, -9+r(i+50)*18, 0.7, 0.7, 0, 0, 6.2832); ctx.fill(); }
-      ctx.globalAlpha = 1; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-18, -11); ctx.lineTo(20, -9); ctx.stroke();
-    }
-    // tail rings + a couple leg bars
-    ctx.lineWidth = 1.4;
-    ctx.restore();
-  }
-
-  // 9c colorpoint — dark mask + boots on the pale body
-  if (ph.pointed) {
-    ctx.save(); fullClip(); ctx.clip(); ctx.fillStyle = EXTREM; ctx.globalAlpha = 0.92;
-    ctx.beginPath(); ctx.ellipse(-37, -2, 6, 5, 0, 0, 6.2832); ctx.fill();   // face mask
-    // four lower-leg boots
-    for (const x of [-14, -9, 15, 21]) { ctx.beginPath(); cap(x, 22, x===15?28:30, 3.6); ctx.fill(); }
-    for (const [px, py] of [[-14,29],[-9,30],[18,29],[21,30]]) { ctx.beginPath(); ctx.ellipse(px, py, 4.2, 2.8, 0, 0, 6.2832); ctx.fill(); }
-    ctx.globalAlpha = 1; ctx.restore();
-    // re-fill ears with point color
-    ctx.fillStyle = EXTREM;
-    ctx.beginPath(); ctx.moveTo(-34, -13); ctx.lineTo(-37, -24); ctx.lineTo(-28, -16); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-28, -14); ctx.lineTo(-29, -25); ctx.lineTo(-22, -16); ctx.closePath(); ctx.fill();
-  }
-
-  // 9e smoke/silver wash (rolled rare founders only — picker can't make these)
-  if (ph.smoke || ph.silver) {
-    ctx.save(); bodyPath(); ctx.clip();
-    const g = ctx.createLinearGradient(0, 14, 0, -6);
-    g.addColorStop(0, 'rgba(247,240,220,0.6)'); g.addColorStop(1, 'rgba(247,240,220,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.rect(-28, -16, 56, 32); ctx.fill();
-    ctx.restore();
-  }
-
-  // 9-WHITE — the 6 named white patterns (clipped to body+legs+face union)
-  const wp = ph.whitePattern || 'solid';
-  if (!ph.pointed && wp !== 'solid') {
-    ctx.save(); ctx.beginPath(); fullClip(); ctx.clip(); ctx.fillStyle = WHITE;
-    const chestOval = () => { ctx.beginPath(); ctx.ellipse(-15, 4, 4.5, 5.5, 0, 0, 6.2832); ctx.fill(); };
-    const paws = () => { for (const [x, y] of [[-14, 29], [-9, 30], [18, 29], [21, 30]]) { ctx.beginPath(); ctx.ellipse(x, y, 4.6, 3.1, 0, 0, 6.2832); ctx.fill(); } };
-    const socksMid = () => { ctx.beginPath(); cap(-14, 20, 29, 3.5); cap(15, 20, 30, 3.8); ctx.fill(); };
-    const chinMuzzle = () => { ctx.beginPath(); ctx.ellipse(-39, 0, 5, 3.5, 0, 0, 6.2832); ctx.fill(); };
-    const blaze = () => { ctx.beginPath(); ctx.ellipse(-34, -6, 2.2, 6, 0, 0, 6.2832); ctx.fill(); };
-    const bib = () => {   // one connected chin→throat→broad chest→belly underside shape
-      ctx.beginPath();
-      ctx.moveTo(-40, 0); ctx.lineTo(-34, 5);
-      ctx.quadraticCurveTo(-30, 10, -22, 11); ctx.lineTo(-6, 12);
-      ctx.quadraticCurveTo(3, 12, 3, 6); ctx.lineTo(-2, -2);
-      ctx.quadraticCurveTo(-10, 1, -20, 1); ctx.lineTo(-34, -2);
-      ctx.closePath(); ctx.fill();
-    };
-    if (wp === 'locket') {
-      chestOval();
-    } else if (wp === 'mitted') {
-      paws(); chinMuzzle();
-    } else if (wp === 'tuxedo') {
-      bib(); paws(); socksMid(); chinMuzzle(); blaze();   // big white shirtfront + feet + chin + nose blaze; back/head/tail = colored jacket
-    } else if (wp === 'bicolor') {
-      bodyPath(); ctx.fill();                              // whole body white...
-      ctx.fillStyle = BASE;                                // ...then colored islands
-      ctx.beginPath(); ctx.ellipse(4, -3, 14, 9, 0, 0, 6.2832); ctx.fill();   // back saddle
-      ctx.beginPath(); ctx.arc(-30, -9, 9, Math.PI, 0, false); ctx.fill();    // head cap
-      ctx.beginPath(); ctx.moveTo(-34, -13); ctx.lineTo(-37, -24); ctx.lineTo(-28, -16); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-28, -14); ctx.lineTo(-29, -25); ctx.lineTo(-22, -16); ctx.closePath(); ctx.fill();
-    } else if (wp === 'van') {
-      bodyPath(); ctx.fill();                              // whole body white
-      ctx.fillStyle = BASE;
-      ctx.beginPath(); ctx.ellipse(-30, -11, 8, 5, 0, 0, 6.2832); ctx.fill();  // head/crown patch
-      ctx.beginPath(); ctx.moveTo(-34, -13); ctx.lineTo(-37, -24); ctx.lineTo(-28, -16); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-28, -14); ctx.lineTo(-29, -25); ctx.lineTo(-22, -16); ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-    if (wp === 'van') { tail(BASE, ph.longHair ? 6 : 6, 1); }   // van keeps a fully colored tail
-  }
-
-  // 10 nose
-  ctx.fillStyle = '#c47080';
-  ctx.beginPath(); ctx.ellipse(-42, -2, 1.2, 1.2, 0, 0, 6.2832); ctx.fill();
-
-  // 11 eye (single, profile)
-  ctx.fillStyle = ph.eyeHex || '#caa64a';
-  ctx.beginPath(); ctx.ellipse(-33, -7, 2.3, 2.9, 0, 0, 6.2832); ctx.fill();
-  if (ph.eyeSectoral) { ctx.fillStyle = '#bcdcee'; ctx.beginPath(); ctx.ellipse(-33.6, -7, 1.1, 2.9, 0, 0, 6.2832); ctx.fill(); }
-  ctx.fillStyle = 'rgba(18,14,10,0.9)';
-  ctx.beginPath(); ctx.ellipse(-33, -7, 0.9, 2.3, 0, 0, 6.2832); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.beginPath(); ctx.ellipse(-33.6, -8, 0.5, 0.5, 0, 0, 6.2832); ctx.fill();
-
-  ctx.restore();
 }
 
 // ─── FOOD & ARENA ─────────────────────────────────────────────
@@ -2997,7 +2800,8 @@ function refreshCard(key) {
   // background subtle
   ctx.fillStyle = 'rgba(0,0,0,0)';
   ctx.fillRect(0,0,canvasEl.width, canvasEl.height);
-  drawCatProfile(ctx, ph, canvasEl.width/2, canvasEl.height/2 + 8, 2.4);
+  const fake = { ...cat, phenotype: ph, age: 60, stage:'adult', state:'wander', floatTexts:[], bornFlash:0, id: key==='A'?1:2 };
+  drawCat(ctx, fake, canvasEl.width/2, canvasEl.height/2 + 10, 2.2, 0);
 
   // name
   document.querySelector(`input[data-name="${key}"]`).value = cat.name;
@@ -3136,7 +2940,8 @@ function refreshStarterVisual(key, cat) {
   if (canvasEl) {
     const ctx = canvasEl.getContext('2d');
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    drawCatProfile(ctx, ph, canvasEl.width / 2, canvasEl.height / 2 + 8, 2.4);
+    const fake = { ...cat, phenotype: ph, age: 60, stage: 'adult', state: 'wander', bornFlash: 0, id: key === 'A' ? 1 : 2 };
+    drawCat(ctx, fake, canvasEl.width / 2, canvasEl.height / 2 + 10, 2.2, 0);
   }
   const tagWrap = document.querySelector(`[data-tags="${key}"]`);
   if (tagWrap) {
